@@ -261,14 +261,88 @@ def _extract_code_lines(text, pattern):
     return seen
 
 
+# SDS บางฉบับไม่ได้เขียนรหัส H/P-code กำกับเลย (เช่น "Hazard Statements : Harmful if swallowed.
+# Causes severe skin burns and eye damage.") เขียนเป็นประโยคบรรยายล้วนๆ ใต้ป้าย "Hazard Statements"/
+# "Precautionary Statements" ตรงๆ ใช้เป็น fallback ตอนหารหัส H/P ไม่เจอเลย
+# ป้ายกลุ่มย่อยของ Precautionary (Prevention/Response/Storage/Disposal) ไม่นับเป็นเนื้อหา ใช้แค่แบ่งจุด
+_GROUP_HEADER_RE = re.compile(r"\b(Prevention|Response|Storage|Disposal)\s*:\s*", re.IGNORECASE)
+# ประโยคแบบ "IF SWALLOWED:"/"IF ON SKIN (or hair):"/"IF INHALED:"/"IF IN EYES:" คือรูปแบบมาตรฐานของ
+# Precautionary (Response) ที่มักมีหลายประโยคย่อยต่อกันเป็นข้อความเดียว (ไม่แยกประโยคซ้ำในกลุ่มนี้)
+_IF_STATEMENT_RE = re.compile(r"\s*(?=\bIF\s+[A-Z][A-Za-z/() ]*:)")
+
+# ขอบเขตหยุดจับสำหรับดึงก้อนข้อความ Hazard/Precautionary Statements ทั้งบล็อก (คนละอันกับ _BLOCK_END
+# ทั่วไป) เพราะป้ายกลุ่มย่อยของ Precautionary เอง (Prevention:/Response:/Storage:/Disposal:) ต้อง "ไม่"
+# ถูกนับเป็นป้ายฟิลด์ใหม่แล้วหยุดจับ (มิฉะนั้นจะตัดข้อความ Response ทิ้งไปทั้งหมด) ใช้ negative lookahead
+# กันไว้เฉพาะ 4 คำนี้ ป้ายฟิลด์อื่นๆ ที่แท้จริง (เช่น "Classification:", "CAS No:") ยังหยุดจับตามปกติ
+_STATEMENT_BLOCK_END = (
+    r"(?=\n[ \t]*\n"
+    r"|\n\s*[·•]"
+    r"|\n\s*(?:SECTION|ส่วนที่)\s*\d+"
+    r"|\n\s*(?!(?:Prevention|Response|Storage|Disposal)\s*:|IF\s+[A-Z])[A-Z][A-Za-z][A-Za-z /,\-]{2,40}\s*:"
+    r"|\n\s*[฀-๿][฀-๿ /]{0,40}\s*:"
+    r"|\Z)"
+)
+
+
+def _raw_statement_block(text, label):
+    """เหมือน _raw_block แต่ใช้ _STATEMENT_BLOCK_END (ไม่หยุดจับที่ป้ายกลุ่มย่อย Prevention/Response/...)
+    สำหรับดึงก้อนข้อความ Hazard/Precautionary Statements ทั้งบล็อกโดยเฉพาะ"""
+    pattern = label + r"\s*:\s*(.+?)" + _STATEMENT_BLOCK_END
+    m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+    return m.group(1) if m else None
+
+
+def _fallback_statements(raw_block):
+    """
+    แยกข้อความ Hazard/Precautionary statement ที่ไม่มีรหัส H/P-code กำกับ ออกเป็นรายการทีละข้อ
+    (ใช้ตอน _extract_code_lines หารหัสไม่เจอเลย) หลักการ:
+      1. รวมทุกบรรทัดเป็นข้อความเดียวก่อน (ของเดิมตัดบรรทัดตามความกว้างหน้ากระดาษ ไม่ใช่ตามประโยคจริง)
+      2. ตัดป้ายกลุ่มย่อย (Prevention/Response/...) ออก ใช้เป็นจุดแบ่งเฉยๆ
+      3. แบ่งก่อนแต่ละ "IF ...:" (พบบ่อยใน Precautionary - Response) เป็นข้อความใหม่
+      4. ข้อความกลุ่ม "IF ...:" เก็บทั้งกลุ่มเป็นข้อเดียว (มาตรฐาน GHS มักรวมหลายประโยคเป็นข้อควรระวัง
+         ข้อเดียว เช่น "IF SWALLOWED: Rinse mouth. Do NOT induce vomiting.") ข้อความอื่นแยกทีละประโยค
+         ด้วยจุด+ตัวใหญ่ถัดไป (Hazard statement/Precautionary - prevention มักเป็นประโยคสั้นแยกข้อกัน)
+    """
+    if not raw_block:
+        return []
+    flat = re.sub(r"\s+", " ", raw_block).strip()
+    flat = _GROUP_HEADER_RE.sub("\x00", flat)
+    flat = _IF_STATEMENT_RE.sub("\x00", flat)
+    chunks = [c.strip() for c in flat.split("\x00") if c.strip()]
+    results = []
+    for chunk in chunks:
+        if re.match(r"^IF\s+[A-Z]", chunk):
+            pieces = [chunk]
+        else:
+            pieces = re.split(r"(?<=[.])\s+(?=[A-Z])", chunk)
+        for piece in pieces:
+            val = _clean(piece)
+            if val and val not in results:
+                results.append(val)
+    return results
+
+
 def extract_hazard_statements(text):
-    """ดึงรายการ Hazard Statement (H-code) พร้อมข้อความ เช่น ['H226 Flammable liquid and vapour.']"""
-    return _extract_code_lines(text, _H_CODE_LINE)
+    """ดึงรายการ Hazard Statement พร้อมข้อความ เช่น ['H226 Flammable liquid and vapour.']
+    ถ้าไม่มีรหัส H-code กำกับเลย (SDS บางฉบับเขียนบรรยายเฉยๆ) fallback ไปแยกประโยคจากป้าย
+    "Hazard Statements" ตรงๆ แทน"""
+    coded = _extract_code_lines(text, _H_CODE_LINE)
+    if coded:
+        return coded
+    section2 = extract_section(text, 2) or text
+    raw = _raw_statement_block(section2, r"Hazard [Ss]tatements?")
+    return _fallback_statements(raw) if raw else []
 
 
 def extract_precautionary_statements(text):
-    """ดึงรายการ Precautionary Statement (P-code) พร้อมข้อความ เช่น ['P210 Keep away from heat.']"""
-    return _extract_code_lines(text, _P_CODE_LINE)
+    """ดึงรายการ Precautionary Statement พร้อมข้อความ เช่น ['P210 Keep away from heat.']
+    ถ้าไม่มีรหัส P-code กำกับเลย fallback ไปแยกประโยคจากป้าย "Precautionary Statements" ตรงๆ แทน"""
+    coded = _extract_code_lines(text, _P_CODE_LINE)
+    if coded:
+        return coded
+    section2 = extract_section(text, 2) or text
+    raw = _raw_statement_block(section2, r"Precautionary [Ss]tatements?")
+    return _fallback_statements(raw) if raw else []
 
 
 def _raw_block(text, label):
