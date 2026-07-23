@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+itsdangerous
+pdfplumber
+reportlab
+pypdf
+deep-translator
+pythainlp
+openpyxl
