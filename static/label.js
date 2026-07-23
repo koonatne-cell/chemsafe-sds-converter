@@ -28,6 +28,7 @@ function fillLabelForm(data) {
     const productName = (data.display_name && data.display_name !== "-") ? data.display_name : (data.trade_name || "");
     document.getElementById("f_product_name").value = productName === "-" ? "" : productName;
     document.getElementById("f_cas").value = (data.cas && data.cas !== "-") ? data.cas : "";
+    document.getElementById("f_un").value = (data.un && data.un !== "-") ? data.un : "";
     document.getElementById("f_signal_word").value = (data.signal_word && data.signal_word !== "-") ? data.signal_word : "";
     document.getElementById("f_hazard_statements").value = listToLines(data.hazard_statements);
     document.getElementById("f_precautionary_statements").value = listToLines(data.precautionary_statements);
@@ -47,6 +48,7 @@ function collectLabelData() {
     const data = {
         product_name: document.getElementById("f_product_name").value,
         cas: document.getElementById("f_cas").value,
+        un: document.getElementById("f_un").value,
         signal_word: document.getElementById("f_signal_word").value,
         hazard_statements: linesToList(document.getElementById("f_hazard_statements").value),
         precautionary_statements: linesToList(document.getElementById("f_precautionary_statements").value),
