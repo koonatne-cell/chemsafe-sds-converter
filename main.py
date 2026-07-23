@@ -31,8 +31,10 @@ import auth
 from parser import parse_sds
 from translator import translate_fields
 from fill_template import fill_from_data
+from label_template import fill_label
 from fields import (FIELD_GROUPS, SIGNATURE_FIELDS, PICTOGRAM_FIELDS,
-                     NFPA_SPECIAL_OPTIONS, TRANSLATABLE_KEYS, ALL_KEYS)
+                     NFPA_SPECIAL_OPTIONS, TRANSLATABLE_KEYS, ALL_KEYS,
+                     LABEL_SIZE_PRESETS)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PDF = os.path.join(HERE, "assets", "Template.pdf")
@@ -164,6 +166,40 @@ def download(filename: str):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="ไม่พบไฟล์")
     return FileResponse(path, media_type="application/pdf", filename=filename)
+
+
+# ---------------------------------------------------------------------------
+# หน้าฉลากภาชนะบรรจุสารเคมี (แยกจากฟอร์ม SDS ติดหน้างาน ใช้ /api/parse ตัวเดียวกันดึงข้อมูล)
+# ---------------------------------------------------------------------------
+
+@app.get("/label")
+def label_page(request: Request):
+    return templates.TemplateResponse(
+        request, "label.html",
+        {"pictogram_fields": PICTOGRAM_FIELDS, "label_size_presets": LABEL_SIZE_PRESETS}
+    )
+
+
+@app.post("/api/label/generate")
+async def api_label_generate(data: UploadFile = File(...)):
+    """สร้างฉลากภาชนะบรรจุ (PDF ขนาดพอดีฉลากที่เลือก) จากข้อมูลที่ผู้ใช้ตรวจ/แก้แล้ว"""
+    import json
+    raw = await data.read()
+    try:
+        field_data = json.loads(raw.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="ข้อมูลฟอร์มไม่ถูกต้อง")
+
+    size_key = field_data.get("size_key", LABEL_SIZE_PRESETS[0][0])
+    out_filename = _safe_filename("label.pdf", "label")
+    out_path = os.path.join(GENERATED_DIR, out_filename)
+
+    try:
+        fill_label(field_data, size_key, LABEL_SIZE_PRESETS, out_path)
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=f"สร้างฉลากไม่ได้: {ex}")
+
+    return JSONResponse({"download_url": f"/download/{out_filename}"})
 
 
 # ---------------------------------------------------------------------------

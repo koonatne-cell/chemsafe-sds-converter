@@ -18,6 +18,7 @@ header {
 header h1 { margin: 0; font-size: 1.3rem; }
 header a { color: #cfe4ff; text-decoration: none; font-size: 0.9rem; }
 header a:hover { text-decoration: underline; }
+.header-links { display: flex; gap: 18px; align-items: center; }
 
 main {
     max-width: 900px;

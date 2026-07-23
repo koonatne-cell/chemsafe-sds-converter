@@ -191,6 +191,80 @@ PICTOGRAM_KEYWORDS = {
 }
 
 
+# รหัส Hazard Statement (H-code, เช่น H226) / Precautionary Statement (P-code, เช่น P210)
+# มักอยู่ในรูปแบบ "รหัส + ข้อความ" หนึ่งบรรทัดต่อหนึ่งข้อ ใน Section 2 (Hazard identification)
+# จับทั้งบรรทัดที่มีรหัสไว้ตรงๆ (ไม่แยกรหัส/ข้อความออกจากกัน) เพราะฉลากต้องแสดงคู่กันเสมออยู่แล้ว
+_H_CODE_LINE = re.compile(r"\bH[2-4]\d{2}\b[^\n]*", re.MULTILINE)
+_P_CODE_LINE = re.compile(r"\bP[1-5]\d{2}(?:\s*\+\s*P[1-5]\d{2})*\b[^\n]*", re.MULTILINE)
+
+
+def _extract_code_lines(text, pattern):
+    """หาแต่ละบรรทัดที่มีรหัส H/P-code ใน Section 2 ก่อน (fallback ทั้งไฟล์ถ้าหา section ไม่เจอ)
+    คืน list ของบรรทัดเรียงตามที่เจอ ไม่เอาบรรทัดซ้ำ"""
+    section2 = extract_section(text, 2) or text
+    seen = []
+    for m in pattern.finditer(section2):
+        val = _clean(m.group(0))
+        if val and val not in seen:
+            seen.append(val)
+    return seen
+
+
+def extract_hazard_statements(text):
+    """ดึงรายการ Hazard Statement (H-code) พร้อมข้อความ เช่น ['H226 Flammable liquid and vapour.']"""
+    return _extract_code_lines(text, _H_CODE_LINE)
+
+
+def extract_precautionary_statements(text):
+    """ดึงรายการ Precautionary Statement (P-code) พร้อมข้อความ เช่น ['P210 Keep away from heat.']"""
+    return _extract_code_lines(text, _P_CODE_LINE)
+
+
+def _raw_block(text, label):
+    """เหมือน block() แต่คืนข้อความดิบ (ไม่ผ่าน _clean ที่รวมทุกบรรทัดเป็นบรรทัดเดียว)
+    ใช้ตอนต้องแยกบรรทัดเอง เช่น แยกชื่อบริษัท/ที่อยู่ที่อยู่ในก้อนเดียวกันแต่คนละบรรทัด"""
+    pattern = label + r"\s*:\s*(.+?)" + _BLOCK_END
+    m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+    return m.group(1) if m else None
+
+
+def extract_supplier_info(text):
+    """ดึงข้อมูลผู้ผลิต/ผู้จำหน่าย + เบอร์โทรฉุกเฉิน จาก Section 1 (สำหรับฉลากภาชนะบรรจุ)"""
+    section1 = extract_section(text, 1) or text
+    name = grab(section1, [
+        line(r"Company"), line(r"Company [Nn]ame"),
+        line(r"Supplier"), line(r"Manufacturer"),
+        line(r"ชื่อบริษัท"), line(r"ผู้ผลิต"), line(r"ผู้จำหน่าย"),
+    ])
+    address = grab(section1, [
+        block(r"Address"), block(r"Street [Aa]ddress"),
+        block(r"ที่อยู่"),
+    ])
+    # SDS หลายฉบับไม่มีป้าย "Address:" แยกต่างหาก แต่ที่อยู่ต่อท้ายชื่อบริษัททันทีคนละบรรทัด
+    # ใต้ป้าย "Manufacturer/Supplier:" เดียวกัน เลยลองแยกบรรทัดเอาบรรทัดแรกเป็นชื่อ ที่เหลือเป็นที่อยู่
+    if name == "-" or address == "-":
+        raw = (_raw_block(section1, r"Manufacturer\s*/\s*Supplier")
+               or _raw_block(section1, r"Supplier")
+               or _raw_block(section1, r"Manufacturer")
+               or _raw_block(section1, r"ผู้ผลิต")
+               or _raw_block(section1, r"ผู้จำหน่าย"))
+        if raw:
+            lines = [ln.strip() for ln in raw.split("\n") if ln.strip()]
+            if name == "-" and lines:
+                name = lines[0]
+            if address == "-" and len(lines) > 1:
+                address = " ".join(lines[1:])
+    return {
+        "supplier_name": name,
+        "supplier_address": address,
+        "emergency_phone": grab(section1, [
+            line(r"Emergency [Tt]elephone(?: [Nn]umber)?"),
+            line(r"Emergency [Pp]hone"),
+            line(r"เบอร์โทรฉุกเฉิน"), line(r"โทรศัพท์ฉุกเฉิน"),
+        ]),
+    }
+
+
 def detect_pictograms(text):
     """
     เดาสัญลักษณ์ GHS ที่น่าจะเกี่ยวข้อง จากคำ/รหัสที่เจอใน SDS (ส่วนมากอยู่ Section 2)
@@ -375,6 +449,11 @@ def parse_sds(pdf_path):
         or grab(t, [r"Reactivity\s*=\s*([0-4])", r"Reactivity\s*[:\-]\s*([0-4])"], default="")
     )
     d["pictograms"] = detect_pictograms(t)
+    # สำหรับหน้า "ฉลากภาชนะบรรจุ" (label.html) - Hazard/Precautionary statement + ข้อมูลผู้ผลิต
+    # ถ้าดึงไม่ครบ ผู้ใช้แก้ไข/พิมพ์เพิ่มเองในฟอร์มได้ (ไม่บังคับต้องดึงได้ 100%)
+    d["hazard_statements"] = extract_hazard_statements(t)
+    d["precautionary_statements"] = extract_precautionary_statements(t)
+    d.update(extract_supplier_info(t))
     # ช่องขาว (Special Hazard) ในรูปเพชร NFPA เดาเบื้องต้นจากสัญลักษณ์ GHS ที่ตรวจเจอ (เลือกได้แค่อย่างเดียว
     # จึงหยุดที่ตัวแรกที่ตรงเงื่อนไข) SDS ไม่ได้ระบุค่านี้ตรงๆ ต้องตรวจสอบเองในฟอร์มเสมอ
     if "oxidizer" in d["pictograms"]:
