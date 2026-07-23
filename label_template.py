@@ -136,6 +136,20 @@ def build_label_pdf(data, size_key, size_presets, out_path):
     else:
         y -= 4
 
+    # "Contains: ..." - รายชื่อสารเคมีอันตราย (จากตารางส่วนผสม Section 3 ถ้ามี) หนึ่งใน 6 องค์ประกอบ
+    # ที่ GHS กำหนดให้ต้องมีบนฉลาก แยกจากชื่อผลิตภัณฑ์เพราะผลิตภัณฑ์อาจเป็นของผสมหลายสาร
+    hazardous_substances = [s.strip() for s in (data.get("hazardous_substances") or []) if s and s.strip()]
+    if hazardous_substances:
+        contains_size = max(6, 7.5 * scale)
+        contains_text = "Contains: " + ", ".join(hazardous_substances)
+        lines = wrap_thai(contains_text, content_w, font_size=contains_size)
+        c.setFont(FONT_REGULAR, contains_size)
+        line_height = contains_size + 1.5
+        for ln in lines:
+            y -= line_height
+            c.drawCentredString(width_pt / 2, y, ln)
+        y -= 4
+
     y -= 4 * scale
 
     # แถวเดียวกัน: สัญลักษณ์ GHS (ซ้าย) + คำสัญญาณตัวหนาสีแดง (ขวา)

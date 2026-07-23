@@ -136,6 +136,30 @@ def parse_cas_from_composition_table(text):
     return best_cas
 
 
+def extract_hazardous_substances(text):
+    """
+    ดึงชื่อสารเคมีอันตราย (ไม่ใช่แค่เลข CAS) จากตาราง "ส่วนประกอบ" ใน Section 3 - ใช้สำหรับบรรทัด
+    "Contains: ..." บนฉลากภาชนะบรรจุ (1 ในองค์ประกอบที่ GHS กำหนดให้มีบนฉลาก) เรียงจาก Concentration (%)
+    สูงสุดไปต่ำสุด คืน [] ถ้าหาตารางแบบนี้ไม่เจอ (SDS สารเดี่ยว ไม่มีตารางส่วนผสม)
+    """
+    section3 = extract_section(text, 3)
+    if not section3:
+        return []
+    rows = []
+    for m in _CAS_TABLE_ROW.finditer(section3):
+        nums = [float(x) for x in re.findall(r"[\d.]+", m.group("conc"))]
+        score = max(nums) if nums else 0
+        name = _clean(m.group("name")) or m.group("name").strip()
+        if name:
+            rows.append((score, name))
+    rows.sort(key=lambda r: r[0], reverse=True)
+    seen = []
+    for _, name in rows:
+        if name not in seen:
+            seen.append(name)
+    return seen
+
+
 def grab_near(text, keyword, patterns, window=300):
     """
     หาค่าเฉพาะในช่วงข้อความ `window` ตัวอักษรถัดจากคำว่า `keyword` (ไม่ใช่ค้นทั้งไฟล์)
@@ -192,19 +216,46 @@ PICTOGRAM_KEYWORDS = {
 
 
 # รหัส Hazard Statement (H-code, เช่น H226) / Precautionary Statement (P-code, เช่น P210)
-# มักอยู่ในรูปแบบ "รหัส + ข้อความ" หนึ่งบรรทัดต่อหนึ่งข้อ ใน Section 2 (Hazard identification)
-# จับทั้งบรรทัดที่มีรหัสไว้ตรงๆ (ไม่แยกรหัส/ข้อความออกจากกัน) เพราะฉลากต้องแสดงคู่กันเสมออยู่แล้ว
-_H_CODE_LINE = re.compile(r"\bH[2-4]\d{2}\b[^\n]*", re.MULTILINE)
-_P_CODE_LINE = re.compile(r"\bP[1-5]\d{2}(?:\s*\+\s*P[1-5]\d{2})*\b[^\n]*", re.MULTILINE)
+# ต้องขึ้นต้นบรรทัด (^) เท่านั้น (ใช้ .match() ไม่ใช่ .search()) เพราะ SDS จำนวนมากจัดหน้าเป็นตาราง
+# "รหัส ... ข้อความ" คนละคอลัมน์แต่อยู่แถวเดียวกัน (บรรทัดเดียวกันหลัง pdfplumber ดึงข้อความออกมา)
+# ถ้าข้อความยาวจน wrap ขึ้นบรรทัดใหม่ (เช่น P305+P351+P338 ที่มีประโยคยาว) ต้องรวมบรรทัดถัดไปเข้ามาด้วย
+# จนกว่าจะเจอรหัสใหม่/หัวข้อย่อยใหม่ (เช่น "Precautionary statements - response")/บรรทัดว่าง
+_H_CODE_LINE = re.compile(r"^H[2-4]\d{2}\b.*")
+_P_CODE_LINE = re.compile(r"^P[1-5]\d{2}(?:\s*[/+]\s*P?[1-5]?\d{0,3})*\b.*")
+# หัวข้อย่อยที่พบบ่อยใน Section 2.2 (Label elements) - เจอแล้วให้หยุดต่อบรรทัด ไม่งั้นจะเอาหัวข้อ
+# ("Precautionary statements - storage") มาต่อท้ายข้อความก่อนหน้าโดยไม่ได้ตั้งใจ
+_LABEL_SUBHEADING = re.compile(
+    r"^(?:hazard statements?|precautionary statements?(?:\s*-\s*\w+)?|"
+    r"supplemental hazard information|signal word|pictograms?|"
+    r"labell?ing according to|classification)\s*:?\s*$",
+    re.IGNORECASE,
+)
 
 
 def _extract_code_lines(text, pattern):
-    """หาแต่ละบรรทัดที่มีรหัส H/P-code ใน Section 2 ก่อน (fallback ทั้งไฟล์ถ้าหา section ไม่เจอ)
-    คืน list ของบรรทัดเรียงตามที่เจอ ไม่เอาบรรทัดซ้ำ"""
+    """หาแต่ละข้อความที่ขึ้นต้นด้วยรหัส H/P-code ใน Section 2 ก่อน (fallback ทั้งไฟล์ถ้าหา section ไม่เจอ)
+    ถ้าข้อความ wrap ต่อในบรรทัดถัดไป (ไม่ใช่รหัสใหม่/หัวข้อย่อย/บรรทัดว่าง) จะรวมเข้าเป็นข้อความเดียวกัน
+    คืน list เรียงตามที่เจอ ไม่เอาข้อความซ้ำ"""
     section2 = extract_section(text, 2) or text
+    entries = []
+    current_idx = None
+    for raw_line in section2.split("\n"):
+        stripped = raw_line.strip()
+        if not stripped:
+            current_idx = None
+            continue
+        if pattern.match(stripped):
+            entries.append(stripped)
+            current_idx = len(entries) - 1
+            continue
+        if _LABEL_SUBHEADING.match(stripped):
+            current_idx = None
+            continue
+        if current_idx is not None:
+            entries[current_idx] += " " + stripped
     seen = []
-    for m in pattern.finditer(section2):
-        val = _clean(m.group(0))
+    for entry in entries:
+        val = _clean(entry)
         if val and val not in seen:
             seen.append(val)
     return seen
@@ -453,6 +504,7 @@ def parse_sds(pdf_path):
     # ถ้าดึงไม่ครบ ผู้ใช้แก้ไข/พิมพ์เพิ่มเองในฟอร์มได้ (ไม่บังคับต้องดึงได้ 100%)
     d["hazard_statements"] = extract_hazard_statements(t)
     d["precautionary_statements"] = extract_precautionary_statements(t)
+    d["hazardous_substances"] = extract_hazardous_substances(t)
     d.update(extract_supplier_info(t))
     # ช่องขาว (Special Hazard) ในรูปเพชร NFPA เดาเบื้องต้นจากสัญลักษณ์ GHS ที่ตรวจเจอ (เลือกได้แค่อย่างเดียว
     # จึงหยุดที่ตัวแรกที่ตรงเงื่อนไข) SDS ไม่ได้ระบุค่านี้ตรงๆ ต้องตรวจสอบเองในฟอร์มเสมอ

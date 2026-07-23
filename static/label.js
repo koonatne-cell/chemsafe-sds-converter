@@ -30,6 +30,7 @@ function fillLabelForm(data) {
     document.getElementById("f_cas").value = (data.cas && data.cas !== "-") ? data.cas : "";
     document.getElementById("f_un").value = (data.un && data.un !== "-") ? data.un : "";
     document.getElementById("f_signal_word").value = (data.signal_word && data.signal_word !== "-") ? data.signal_word : "";
+    document.getElementById("f_hazardous_substances").value = listToLines(data.hazardous_substances);
     document.getElementById("f_hazard_statements").value = listToLines(data.hazard_statements);
     document.getElementById("f_precautionary_statements").value = listToLines(data.precautionary_statements);
     document.getElementById("f_supplier_name").value = (data.supplier_name && data.supplier_name !== "-") ? data.supplier_name : "";
@@ -50,6 +51,7 @@ function collectLabelData() {
         cas: document.getElementById("f_cas").value,
         un: document.getElementById("f_un").value,
         signal_word: document.getElementById("f_signal_word").value,
+        hazardous_substances: linesToList(document.getElementById("f_hazardous_substances").value),
         hazard_statements: linesToList(document.getElementById("f_hazard_statements").value),
         precautionary_statements: linesToList(document.getElementById("f_precautionary_statements").value),
         supplier_name: document.getElementById("f_supplier_name").value,

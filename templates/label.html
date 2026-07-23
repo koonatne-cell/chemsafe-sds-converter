@@ -50,6 +50,15 @@
         </fieldset>
 
         <fieldset>
+            <legend>สารเคมีอันตราย (Hazardous substances - ระบบลองดึงจากตารางส่วนผสม Section 3 ให้ก่อน
+                เรียงจาก % สูงสุด บรรทัดละ 1 ชื่อ แก้ไข/เพิ่มเองได้)</legend>
+            <div class="field-row">
+                <textarea id="f_hazardous_substances" name="hazardous_substances" rows="3"
+                          placeholder="เช่น Sodium hydroxide"></textarea>
+            </div>
+        </fieldset>
+
+        <fieldset>
             <legend>สัญลักษณ์ GHS (Hazard pictograms)</legend>
             <div class="pictogram-grid">
                 {% for key, label in pictogram_fields %}
