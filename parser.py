@@ -22,10 +22,13 @@ def read_all_text(pdf_path):
 
 # วลีที่แปลว่า "ไม่มีข้อมูล" ในภาษาของ SDS ถ้าค่าที่ดึงได้ขึ้นต้นด้วยวลีพวกนี้ (ไม่สนตัวพิมพ์เล็ก-ใหญ่)
 # ให้ถือว่าไม่มีข้อมูลจริงๆ คืนค่า "-" แทน ไม่ใช่ก็อปข้อความ "No data available" มาใส่ในฟอร์มตรงๆ
+# (คำไทยเลือกเฉพาะวลีที่ชัดเจนว่า "ไม่มีข้อมูล" เท่านั้น ไม่ใช่ "ไม่มี" เฉยๆ เพราะ "ไม่มี" เดี่ยวๆ
+# อาจเป็นคำตอบจริงที่มีความหมาย เช่น "กลิ่น: ไม่มี" หมายถึงไม่มีกลิ่น ไม่ใช่ไม่มีข้อมูล)
 _NO_DATA_PREFIXES = (
     "no data available", "no data", "not applicable", "not determined",
     "not established", "no special", "not available",
     "void", "n/a", "na", "none",
+    "ไม่มีข้อมูล", "ไม่พบข้อมูล", "ไม่มีข้อกำหนดพิเศษ", "ไม่ระบุ", "ไม่ได้กำหนด", "ไม่เกี่ยวข้อง",
 )
 
 
@@ -64,9 +67,17 @@ def grab(text, patterns, default="-"):
 #       หรือขึ้นบรรทัดใหม่ หรือจบข้อความ - ใช้กับค่าสั้นๆ บรรทัดเดียว (เช่น pH, สี, กลิ่น)
 # BLOCK: หยุดที่บรรทัดว่าง, บรรทัดที่ขึ้นต้นด้วยสัญลักษณ์บูลเล็ต (· • เป็นหัวข้อย่อยใหม่ พบบ่อยมากใน SDS
 #        หลายฉบับที่แต่ละหัวข้อมีแค่บรรทัดเดียวไม่มีบรรทัดว่างคั่น), บรรทัดที่ดูเหมือนหัวข้อใหม่ (ขึ้นต้นด้วย
-#        ตัวใหญ่แล้วตามด้วย ":"), หรือจบข้อความ - ใช้กับค่าที่อาจยาวจน wrap หลายบรรทัด (เช่น วิธีกำจัด)
+#        ตัวใหญ่ภาษาอังกฤษ หรือตัวอักษรไทย แล้วตามด้วย ":") หรือจบข้อความ - ใช้กับค่าที่อาจยาวจน wrap
+#        หลายบรรทัด (เช่น วิธีกำจัด) สำคัญ: ต้องรองรับ SDS ภาษาไทยด้วย เพราะภาษาไทยไม่มีตัวพิมพ์ใหญ่-เล็ก
+#        แบบอังกฤษ [A-Z] จึงจับไม่ได้ ต้องเช็คช่วง unicode ไทย (฀-๿) แยกต่างหาก
 _LINE_END = r"(?=\s{2,}|\n|\Z)"
-_BLOCK_END = r"(?=\n[ \t]*\n|\n\s*[·•]|\n\s*[A-Z][A-Za-z][A-Za-z /,\-]{2,40}\s*:|\Z)"
+_BLOCK_END = (
+    r"(?=\n[ \t]*\n"
+    r"|\n\s*[·•]"
+    r"|\n\s*[A-Z][A-Za-z][A-Za-z /,\-]{2,40}\s*:"
+    r"|\n\s*[฀-๿][฀-๿ /]{0,40}\s*:"
+    r"|\Z)"
+)
 
 
 def line(label):
@@ -81,15 +92,16 @@ def block(label):
 
 def extract_section(text, section_num, next_section_num=None):
     """
-    ตัดข้อความมาเฉพาะช่วง "SECTION N" จนถึงก่อน "SECTION N+1" (SDS มาตรฐาน 16 หัวข้อมักขึ้นต้นแบบนี้)
+    ตัดข้อความมาเฉพาะช่วง "SECTION N" (หรือ "ส่วนที่ N" สำหรับ SDS ภาษาไทย) จนถึงก่อนหัวข้อถัดไป
+    (SDS มาตรฐาน 16 หัวข้อมักขึ้นต้นแบบนี้ทั้งฉบับอังกฤษและไทย)
     คืน None ถ้าหาหัวข้อนี้ไม่เจอ (ใช้บอกว่าควร fallback ไปค้นทั้งไฟล์แทน)
 
-    สำคัญ: ทำแบบนี้เพราะหลาย section ใช้ป้ายย่อยชื่อเดียวกัน (เช่น "Eyes:", "Skin:", "Ingestion:",
-    "Inhalation:") ทั้งใน Section 4 (การปฐมพยาบาล) และ Section 11 (พิษวิทยา) ความหมายคนละเรื่องกัน
-    ถ้าค้นทั้งไฟล์เฉยๆ อาจไปจับข้อความจาก section ผิดมาใส่ผิดช่องได้
+    สำคัญ: ทำแบบนี้เพราะหลาย section ใช้ป้ายย่อยชื่อเดียวกัน (เช่น "Eyes:"/"ทางตา" ทั้งใน Section 4
+    (การปฐมพยาบาล) และ Section 11 (พิษวิทยา) ความหมายคนละเรื่องกัน ถ้าค้นทั้งไฟล์เฉยๆ อาจไปจับข้อความ
+    จาก section ผิดมาใส่ผิดช่องได้
     """
     next_num = next_section_num or (section_num + 1)
-    pattern = rf"SECTION\s*{section_num}\b.*?(?=SECTION\s*{next_num}\b|\Z)"
+    pattern = rf"(?:SECTION|ส่วนที่)\s*{section_num}\b.*?(?=(?:SECTION|ส่วนที่)\s*{next_num}\b|\Z)"
     m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
     return m.group(0) if m else None
 
@@ -162,16 +174,19 @@ FIELD_KEYS = [
 # คำ/รหัสที่มักเจอใน Section 2 (Hazards identification) ของ SDS ที่บ่งบอกว่าควรมีสัญลักษณ์ GHS ชนิดนั้น
 # ใช้เดาเบื้องต้นให้เท่านั้น ผู้ใช้ต้องตรวจ/ติ๊กเลือกเองในฟอร์มอีกครั้งก่อนสร้าง PDF เสมอ
 PICTOGRAM_KEYWORDS = {
-    "explosive": [r"\bGHS0?1\b", r"\bexplosive\b", r"self-?reactive"],
-    "flammable": [r"\bGHS0?2\b", r"\bflammable\b", r"\bpyrophoric\b"],
-    "oxidizer": [r"\bGHS0?3\b", r"\boxidi[sz]ing\b", r"\boxidi[sz]er\b"],
-    "gas_cylinder": [r"\bGHS0?4\b", r"gas(?:es)? under pressure", r"compressed gas"],
-    "corrosive": [r"\bGHS0?5\b", r"skin corrosion", r"\bcorrosive\b", r"serious eye damage"],
-    "toxic": [r"\bGHS0?6\b", r"acute toxicity", r"\bfatal if\b", r"\btoxic if\b"],
-    "irritant": [r"\bGHS0?7\b", r"skin irritation", r"eye irritation", r"\birritant\b"],
+    "explosive": [r"\bGHS0?1\b", r"\bexplosive\b", r"self-?reactive", r"วัตถุระเบิด", r"สารระเบิด"],
+    "flammable": [r"\bGHS0?2\b", r"\bflammable\b", r"\bpyrophoric\b", r"สารไวไฟ", r"ไวไฟ"],
+    "oxidizer": [r"\bGHS0?3\b", r"\boxidi[sz]ing\b", r"\boxidi[sz]er\b", r"สารออกซิไดซ์", r"ออกซิไดซ์"],
+    "gas_cylinder": [r"\bGHS0?4\b", r"gas(?:es)? under pressure", r"compressed gas", r"ก๊าซภายใต้ความดัน"],
+    "corrosive": [r"\bGHS0?5\b", r"skin corrosion", r"\bcorrosive\b", r"serious eye damage",
+                  r"สารกัดกร่อน", r"กัดกร่อน"],
+    "toxic": [r"\bGHS0?6\b", r"acute toxicity", r"\bfatal if\b", r"\btoxic if\b", r"พิษเฉียบพลัน", r"เป็นพิษ"],
+    "irritant": [r"\bGHS0?7\b", r"skin irritation", r"eye irritation", r"\birritant\b",
+                 r"สารระคายเคือง", r"ระคายเคือง"],
     "health_hazard": [r"\bGHS0?8\b", r"carcinogen", r"respiratory sensiti[sz]", r"reproductive toxicity",
-                       r"specific target organ", r"aspiration hazard"],
-    "environment": [r"\bGHS0?9\b", r"aquatic (?:acute|chronic)", r"hazardous to the aquatic environment"],
+                       r"specific target organ", r"aspiration hazard", r"สารก่อมะเร็ง", r"อันตรายต่อสุขภาพ"],
+    "environment": [r"\bGHS0?9\b", r"aquatic (?:acute|chronic)", r"hazardous to the aquatic environment",
+                     r"อันตรายต่อสิ่งแวดล้อม", r"เป็นพิษต่อสิ่งมีชีวิตในน้ำ"],
 }
 
 
@@ -206,10 +221,12 @@ def parse_sds(pdf_path):
         line(r"Product name"),
         line(r"Product Name"),
         line(r"Material name"),
+        line(r"ชื่อทางการค้า"), line(r"ชื่อผลิตภัณฑ์"), line(r"ชื่อสินค้า"),
     ])
     d["display_name"] = d["trade_name"]  # ค่าเริ่มต้น: ใช้ชื่อเดียวกับ trade_name (แก้แยกได้ในฟอร์ม)
     d["signal_word"] = grab(t, [
         line(r"Signal [Ww]ord"),
+        line(r"คำสัญญาณ"),
     ])
     # ถ้า Section 3 มีตารางส่วนประกอบหลายสาร ให้เลือกเลข CAS ของสารที่ Concentration (%) สูงสุดก่อน
     # (ถือเป็นสารหลักของผลิตภัณฑ์) ถ้าไม่มีตารางแบบนี้ (สารเดี่ยว) ค่อย fallback ไปหา "CAS No:" ปกติ
@@ -217,38 +234,45 @@ def parse_sds(pdf_path):
         r"CAS Number\s*:\s*\n?\s*([\d\-]+)",
         r"CAS[\-\s]?No\.?\s*:\s*\n?\s*([\d\-]+)",
         r"CAS Registry Number\s*:\s*\n?\s*([\d\-]+)",
+        r"(?:เลขทะเบียน|หมายเลข)\s*CAS\s*:\s*\n?\s*([\d\-]+)",
     ])
     d["un"] = grab(t, [
         r"UN[- ]Number.*?\n.*?IATA\s+([^\n]+?)" + _LINE_END,
         line(r"UN[\-\s]?Number"),
         line(r"UN[\-\s]?No\.?"),
+        line(r"(?:เลข|หมายเลข)\s*UN"),
     ])
     d["formula"] = grab(t, [
         line(r"Chemical formula"),
         line(r"Formula"),
+        line(r"สูตรทางเคมี"), line(r"สูตรโมเลกุล"),
     ])
     d["usage"] = grab(t, [
         r"Application of the substance / the mixture\s*(.+?)" + _BLOCK_END,
         block(r"Recommended use"),
         block(r"Product use"),
         block(r"Uses of the [Ss]ubstance.*?"),
+        block(r"(?:ลักษณะ|วัตถุประสงค์)?การใช้งาน"),
     ])
     d["state"] = grab(t, [
         line(r"Form"),
         line(r"Physical [Ss]tate"),
         line(r"Appearance"),
+        line(r"สถานะ"), line(r"ลักษณะทางกายภาพ"),
     ])
-    d["color"] = grab(t, [line(r"Colou?r")])
-    d["odor"] = grab(t, [line(r"Odou?r")])
+    d["color"] = grab(t, [line(r"Colou?r"), line(r"สี")])
+    d["odor"] = grab(t, [line(r"Odou?r"), line(r"กลิ่น")])
     d["boiling"] = grab(t, [
         line(r"Boiling point/Boiling range"),
         line(r"Boiling [Pp]oint,?\s*(?:initial boiling point\s*)?(?:and\s*)?(?:boiling\s*)?(?:range)?"),
+        line(r"จุดเดือด"),
     ])
     d["ph"] = grab(t, [
         line(r"pH[\-\s]?value"),
         line(r"pH"),
+        line(r"ความเป็นกรด[\-\s]?ด่าง"),
     ])
-    d["flash"] = grab(t, [line(r"Flash [Pp]oint")])
+    d["flash"] = grab(t, [line(r"Flash [Pp]oint"), line(r"จุดวาบไฟ")])
     # Section 4 (การปฐมพยาบาล) - ค้นในช่วง Section 4 ก่อน กันไปจับ Section 11 (พิษวิทยา) ผิด
     # ป้ายเปล่าๆ อย่าง "Eyes:"/"Skin:"/"Ingestion:"/"Inhalation:" ต้องยึดให้อยู่ต้นบรรทัดเท่านั้น
     # (ไม่งั้น "After inhalation:" จะโดนจับซ้อนเพราะมีคำว่า "inhalation:" อยู่ข้างในเป็น substring)
@@ -257,49 +281,59 @@ def parse_sds(pdf_path):
         block(r"Eye [Cc]ontact"),
         block(r"If in eyes"),
         block(r"(?:^|\n)\s*Eyes"),
+        block(r"(?:^|\n)\s*ทางตา"),
     ])
     d["fa_oral"] = grab_scoped(t, section4, [
         block(r"After swallowing"),
         block(r"If [Ss]wallowed"),
         block(r"(?:^|\n)\s*Ingestion"),
+        block(r"(?:^|\n)\s*ทางปาก"), block(r"(?:กรณี)?การกลืนกิน"),
     ])
     d["fa_skin"] = grab_scoped(t, section4, [
         block(r"After skin contact"),
         block(r"Skin [Cc]ontact"),
         block(r"If on skin"),
         block(r"(?:^|\n)\s*Skin"),
+        block(r"(?:^|\n)\s*ทางผิวหนัง"),
     ])
     d["fa_inhale"] = grab_scoped(t, section4, [
         block(r"After inhalation"),
         block(r"If [Ii]nhaled"),
         block(r"(?:^|\n)\s*Inhalation"),
+        block(r"(?:^|\n)\s*ทางการหายใจ"), block(r"การหายใจเข้าไป"), block(r"การสูดดม"),
     ])
     # Section 11 (พิษวิทยา) - ค้นในช่วง Section 11 ก่อน กันไปจับ Section 4 (ปฐมพยาบาล) ผิด
     d["hz_eye"] = grab_scoped(t, section11, [
         block(r"on the eye"),
         block(r"Eye [Ii]rritation"),
         block(r"(?:^|\n)\s*Eyes"),
+        block(r"(?:^|\n)\s*ทางตา"),
     ])
     d["hz_skin"] = grab_scoped(t, section11, [
         block(r"on the skin"),
         block(r"Skin [Ii]rritation"),
         block(r"(?:^|\n)\s*Skin"),
+        block(r"(?:^|\n)\s*ทางผิวหนัง"),
     ])
     d["hz_oral"] = grab_scoped(t, section11, [
         block(r"(?:^|\n)\s*Ingestion"),
+        block(r"(?:^|\n)\s*ทางปาก"),
     ])
     d["hz_inhale"] = grab_scoped(t, section11, [
         block(r"(?:^|\n)\s*Inhalation"),
+        block(r"(?:^|\n)\s*ทางการหายใจ"), block(r"การสูดดม"),
     ])
     d["fire"] = grab(t, [
         block(r"Suitable extinguishing agents"),
         block(r"Suitable extinguishing media"),
         block(r"Extinguishing media"),
+        block(r"(?:วิธี)?การดับเพลิง"), block(r"สารดับเพลิงที่เหมาะสม"),
     ])
     d["reactivity"] = grab(t, [
         r"Possibility of hazardous reactions\s*(.+?)" + _BLOCK_END,
         block(r"Hazardous reactions"),
         block(r"Chemical stability"),
+        block(r"การเกิดปฏิกิริยา"), block(r"ความเสถียรทางเคมี"), block(r"โอกาสเกิดปฏิกิริยาอันตราย"),
     ])
     # Section 6 (การจัดการเมื่อรั่วไหล) - "Methods for cleaning up" คือสิ่งที่ตรงกับ "กรณีหกรั่วไหล" ที่สุด
     # ถ้าไม่เจอค่อย fallback ไปที่ "Environmental precautions" (ยังพอเกี่ยวข้องแต่ไม่ตรงเป๊ะ)
@@ -308,16 +342,19 @@ def parse_sds(pdf_path):
         block(r"Methods for [Cc]leaning up"),
         block(r"Methods for containment"),
         block(r"Environmental precautions"),
+        block(r"วิธีปฏิบัติเมื่อ(?:มี)?การหกรั่วไหล"), block(r"(?:กรณี|การจัดการเมื่อ)สารหกรั่วไหล"),
     ])
     d["disposal"] = grab(t, [
         block(r"Recommendation"),
         block(r"Disposal methods"),
         block(r"Waste treatment methods"),
+        block(r"(?:วิธี|คำแนะนำ)?การกำจัด"),
     ])
     d["storage"] = grab(t, [
         block(r"Requirements to be met by storerooms and receptacles"),
         block(r"Storage conditions"),
         block(r"Conditions for safe storage"),
+        block(r"การเก็บรักษา"), block(r"สภาวะการเก็บรักษาที่ปลอดภัย"),
     ])
     # ดัชนี NFPA มักอยู่ในรูปไดอะแกรมเพชร ไม่ใช่ข้อความเรียงกันแบบปกติ - pdfplumber อาจดึงตัวเลข/ป้าย
     # ออกมาสลับตำแหน่งกับข้อความส่วนอื่นของเอกสาร (เช่น ตาราง HMIS ที่อยู่ใกล้กัน) ถ้าค้นทั้งไฟล์เฉยๆ
