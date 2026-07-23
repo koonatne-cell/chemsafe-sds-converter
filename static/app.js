@@ -14,6 +14,21 @@ function setStatus(el, text, kind) {
     el.className = "status " + (kind || "");
 }
 
+// ---------- จัดทำโดย/อนุมัติโดย มักเป็นคนเดียวกัน - พิมพ์ชื่อ "จัดทำโดย" แล้วก๊อปไปช่อง
+// "อนุมัติโดย" ให้อัตโนมัติ จนกว่าผู้ใช้จะพิมพ์แก้ช่อง "อนุมัติโดย" เองโดยตรง (ถือว่าตั้งใจแยกคนละคน) ----------
+(function setupSignatureNameSync() {
+    const preparedName = document.getElementById("f_prepared_name");
+    const approvedName = document.getElementById("f_approved_name");
+    if (!preparedName || !approvedName) return;
+    let approvedTouchedManually = false;
+    preparedName.addEventListener("input", () => {
+        if (!approvedTouchedManually) approvedName.value = preparedName.value;
+    });
+    approvedName.addEventListener("input", () => {
+        approvedTouchedManually = true;
+    });
+})();
+
 // อ่านค่าปัจจุบันจากฟอร์มทั้งหมด คืนเป็น dict {key: value} (pictograms เป็น array แยกต่างหาก)
 function collectFormData() {
     const data = {};

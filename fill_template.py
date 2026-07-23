@@ -116,11 +116,23 @@ NFPA_SPECIAL_X_CENTER, NFPA_SPECIAL_TOP_CENTER = 528.0, 333.4
 # ช่อง "จัดทำโดย" / "อนุมัติโดย" (ชื่อ-สกุล, ตำแหน่ง) หาตำแหน่งจริงจาก Template.pdf ด้วย pdfplumber
 # วางต่อท้ายป้าย "ชื่อ-สกุล" / "ตำแหน่ง" ที่มีอยู่แล้วในเทมเพลต ถ้าไม่กรอกค่า
 # ป้ายเดิมของเทมเพลต (เช่น "(EHS Manager)") จะยังอยู่เหมือนเดิม เพราะเราวาดทับเฉพาะตอนมีค่าเท่านั้น
+# ขยับลงมาจากตำแหน่งเดิม (762/777 -> 765/780) เพราะตอนนี้มีชื่อไปโชว์อีกจุดบนบรรทัด "จัดทำโดย :"
+# ด้านบนด้วย (ดู SIGNATURE_HEADER) เลยเว้นระยะห่างเพิ่มอีกนิดกันดูอัดแน่นเกินไป
 SIGNATURE = {
-    "prepared_name":     (95,  762),  # จัดทำโดย - ชื่อ-สกุล
-    "prepared_position": (95,  777),  # จัดทำโดย - ตำแหน่ง
-    "approved_name":     (443, 762),  # อนุมัติโดย - ชื่อ-สกุล
-    "approved_position": (444, 777),  # อนุมัติโดย - ตำแหน่ง
+    "prepared_name":     (95,  765),  # จัดทำโดย - ชื่อ-สกุล
+    "prepared_position": (95,  780),  # จัดทำโดย - ตำแหน่ง
+    "approved_name":     (443, 765),  # อนุมัติโดย - ชื่อ-สกุล
+    "approved_position": (444, 780),  # อนุมัติโดย - ตำแหน่ง
+}
+# ชื่อผู้จัดทำ/ผู้อนุมัติ อีกจุดหนึ่ง วางต่อท้ายป้าย "จัดทำโดย :" / "อนุมัติโดย :" ตรงๆ (ตัวหนา)
+# ซ้ำกับชื่อที่โชว์อยู่แล้วในบรรทัด "ชื่อ-สกุล" ด้านล่าง ตามที่ผู้ใช้อยากให้เห็นชื่อคนเดียวกันทั้งสองจุด
+SIGNATURE_HEADER = {
+    "prepared_name": (100, 746.5),
+    "approved_name": (438, 746.5),
+}
+SIGNATURE_HEADER_MAX_WIDTH = {
+    "prepared_name": 290,
+    "approved_name": 145,
 }
 # ความกว้างจริงที่มีก่อนชนขอบกระดาษ/คอลัมน์ถัดไป (กันชื่อ-ตำแหน่งยาวๆ ทับข้อความอื่น)
 SIGNATURE_MAX_WIDTH = {
@@ -204,19 +216,20 @@ for _k, (_x, _top) in SHORT.items():
     _SHORT_MAX_WIDTH[_k] = max(_boundary - _x - 6, 20)
 
 
-def _fit_single_line(val, max_width, base_size=7, min_size=5.5):
+def _fit_single_line(val, max_width, base_size=7, min_size=5.5, font=None):
     """
     หาขนาดฟอนต์ + ข้อความ 1 บรรทัด ที่พอดีกับความกว้างจริง (max_width) โดยวัดความกว้างจริง
     ด้วย stringWidth (ไม่ใช่การนับตัวอักษรเดา) ลดฟอนต์ก่อน ถ้ายังไม่พอค่อยตัดข้อความแล้วใส่ "…"
     """
+    font = font or FONT_REGULAR
     size = base_size
     while size >= min_size:
-        if stringWidth(val, FONT_REGULAR, size) <= max_width:
+        if stringWidth(val, font, size) <= max_width:
             return size, val
         size -= 0.5
     # เล็กสุดแล้วยังไม่พอ ตัดตัวอักษรออกทีละตัวจนกว่าจะพอดี (คำนวณความกว้างจริงทุกครั้ง)
     text = val
-    while len(text) > 1 and stringWidth(text + "…", FONT_REGULAR, min_size) > max_width:
+    while len(text) > 1 and stringWidth(text + "…", font, min_size) > max_width:
         text = text[:-1]
     return min_size, text.rstrip() + "…"
 
@@ -389,15 +402,28 @@ def build_overlay(data, label_image_path=None, container_image_path=None):
         c.saveState(); c.translate(x, Y(top))
         draw_text(c, data.get(k, ""), _available_height(top, data), BLOCK_MAX_WIDTH.get(k), size=7)
         c.restoreState()
-    # ช่องจัดทำโดย/อนุมัติโดย (บรรทัดเดียว)
+    # ช่องจัดทำโดย/อนุมัติโดย (บรรทัดเดียว) - ใส่วงเล็บครอบชื่อ/ตำแหน่ง "( ... )" ให้เหมือนตัวอย่าง
+    # ที่พิมพ์ไว้แล้วในเทมเพลตฝั่ง "อนุมัติโดย" เช่น "(EHS Manager)" ให้ทั้งสองฝั่งดูสม่ำเสมอกัน
     for k, (x, top) in SIGNATURE.items():
         val = (data.get(k) or "").strip()
         if val and val != "-" and k in SIGNATURE_COVER:
             # ปิดข้อความตัวอย่างเดิมของเทมเพลตก่อน (เฉพาะตอนมีค่าจริงมาแทน)
             _cover_box(c, SIGNATURE_COVER[k])
+        display_val = f"( {val} )" if val and val != "-" else val
         c.saveState(); c.translate(x, Y(top))
-        draw_text(c, data.get(k, ""), 12, size=7, single_line=True,
+        draw_text(c, display_val, 12, size=7, single_line=True,
                   max_width=SIGNATURE_MAX_WIDTH.get(k))
+        c.restoreState()
+    # ชื่อผู้จัดทำ/ผู้อนุมัติ อีกจุด ต่อท้ายป้าย "จัดทำโดย :" / "อนุมัติโดย :" ตรงๆ (ตัวหนา) ให้เห็น
+    # ชื่อคนเดียวกันซ้ำทั้งสองจุด (หัวบรรทัด + บรรทัด "ชื่อ-สกุล" ด้านล่าง)
+    for k, (x, top) in SIGNATURE_HEADER.items():
+        val = (data.get(k) or "").strip()
+        if not val or val == "-":
+            continue
+        c.saveState(); c.translate(x, Y(top))
+        font_size, text = _fit_single_line(val, SIGNATURE_HEADER_MAX_WIDTH.get(k, 200), base_size=8, font=FONT_BOLD)
+        c.setFont(FONT_BOLD, font_size)
+        c.drawString(0, 0, text)
         c.restoreState()
     # NFPA เลขเดี่ยว วางกึ่งกลางสี่เหลี่ยมย่อยแต่ละสี ใช้สีขาวเพราะพื้นหลังเป็นสีเข้ม (แดง/น้ำเงิน)
     NFPA_SIZE = 11
