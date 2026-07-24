@@ -28,6 +28,10 @@
 
     <div class="card">
         <div class="step-label">ขั้นตอนที่ 2: ตรวจ/แก้ไขข้อมูลบนฉลาก</div>
+        <div class="actions-row" style="margin-bottom: 16px;">
+            <button id="translateBtn">แปลเป็นไทย</button>
+            <span id="translateStatus" class="status"></span>
+        </div>
 
         <fieldset>
             <legend>ข้อมูลหลัก</legend>
@@ -132,6 +136,11 @@
     </div>
 
 </main>
+<script>
+    // รายชื่อ key ที่ควรแปลเป็นไทยในหน้านี้ (มาจาก fields.LABEL_TRANSLATABLE_KEYS ฝั่ง backend
+    // ให้ label.js ใช้ค่าเดียวกันเสมอ ไม่ต้องคัดลอกรายการซ้ำสองที่)
+    const LABEL_TRANSLATABLE_KEYS = {{ label_translatable_keys | tojson }};
+</script>
 <script src="/static/label.js"></script>
 </body>
 </html>

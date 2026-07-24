@@ -2,6 +2,8 @@
 
 const parseBtn = document.getElementById("parseBtn");
 const parseStatus = document.getElementById("parseStatus");
+const translateBtn = document.getElementById("translateBtn");
+const translateStatus = document.getElementById("translateStatus");
 const generateBtn = document.getElementById("generateBtn");
 const generateStatus = document.getElementById("generateStatus");
 const downloadLink = document.getElementById("downloadLink");
@@ -93,6 +95,29 @@ parseBtn.addEventListener("click", async () => {
         setStatus(parseStatus, "ผิดพลาด: " + ex.message, "err");
     } finally {
         parseBtn.disabled = false;
+    }
+});
+
+// ---------- แปลเป็นไทย (ไม่แปล product_name/cas/un/supplier_name/emergency_phone
+// เพราะเป็นชื่อเฉพาะ/รหัส/เบอร์โทร ดู LABEL_TRANSLATABLE_KEYS ใน fields.py) ----------
+translateBtn.addEventListener("click", async () => {
+    setStatus(translateStatus, "กำลังแปล...", "busy");
+    translateBtn.disabled = true;
+    try {
+        const data = collectLabelData();
+        const res = await fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data, keys: LABEL_TRANSLATABLE_KEYS }),
+        });
+        if (!res.ok) throw new Error("แปลไม่สำเร็จ");
+        const json = await res.json();
+        fillLabelForm(json.data);
+        setStatus(translateStatus, "แปลเสร็จแล้ว – ตรวจคำแปลอีกครั้งก่อนสร้างฉลาก", "ok");
+    } catch (ex) {
+        setStatus(translateStatus, "ผิดพลาด: " + ex.message, "err");
+    } finally {
+        translateBtn.disabled = false;
     }
 });
 

@@ -90,6 +90,14 @@ ALL_KEYS = ([key for _, fields in FIELD_GROUPS for key, _, _ in fields]
             + [key for key, _ in SIGNATURE_FIELDS]
             + ["nfpa_special"])
 
+# รายชื่อ key ในหน้าฉลากภาชนะบรรจุ (label.html) ที่ควรแปลเป็นไทย (ใช้ตอนกดปุ่ม "แปลเป็นไทย")
+# ไม่รวม product_name/cas/un/supplier_name/emergency_phone เพราะเป็นชื่อเฉพาะ/รหัส/เบอร์โทร
+# แปลแล้วจะเพี้ยน (ดูปัญหาเดิมที่ trade_name เคยถูกแปลงเป็นคำทับศัพท์ผิดๆ ใน fields.py ด้านบน)
+LABEL_TRANSLATABLE_KEYS = [
+    "signal_word", "hazardous_substances", "hazard_statements",
+    "precautionary_statements", "supplemental_info",
+]
+
 # ขนาดฉลากภาชนะบรรจุที่เลือกได้ (key, ป้ายไทย, กว้าง มม., สูง มม.) - preset มาตรฐานตาม
 # ขนาดสติกเกอร์ที่ใช้ติดภาชนะสารเคมีทั่วไป ผู้ใช้ปรับแต่งข้อความ/ขนาดตัวอักษรได้เอง
 # ในฟอร์มก่อนสร้าง PDF อยู่แล้ว (ระบบคำนวณ font size ให้เหมาะกับขนาดที่เลือกอัตโนมัติ)

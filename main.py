@@ -34,7 +34,7 @@ from fill_template import fill_from_data
 from label_template import fill_label
 from fields import (FIELD_GROUPS, SIGNATURE_FIELDS, PICTOGRAM_FIELDS,
                      NFPA_SPECIAL_OPTIONS, TRANSLATABLE_KEYS, ALL_KEYS,
-                     LABEL_SIZE_PRESETS)
+                     LABEL_SIZE_PRESETS, LABEL_TRANSLATABLE_KEYS)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PDF = os.path.join(HERE, "assets", "Template.pdf")
@@ -104,9 +104,12 @@ async def api_parse(sds_file: UploadFile = File(...)):
 
 @app.post("/api/translate")
 async def api_translate(payload: dict):
-    """รับ dict ข้อมูล (อังกฤษ) แปลเฉพาะฟิลด์ที่ควรแปล คืนข้อมูลชุดใหม่"""
+    """รับ dict ข้อมูล (อังกฤษ) แปลเฉพาะฟิลด์ที่ควรแปล คืนข้อมูลชุดใหม่
+    ส่ง "keys" มาเองได้ (เช่นหน้าฉลากใช้ LABEL_TRANSLATABLE_KEYS คนละชุดกับฟอร์ม SDS ติดหน้างาน)
+    ถ้าไม่ส่งมา ใช้ TRANSLATABLE_KEYS เดิม (ฟอร์ม SDS ติดหน้างาน)"""
     data = payload.get("data", {})
-    translated = translate_fields(data, TRANSLATABLE_KEYS)
+    keys = payload.get("keys") or TRANSLATABLE_KEYS
+    translated = translate_fields(data, keys)
     return JSONResponse({"data": translated})
 
 
@@ -176,7 +179,8 @@ def download(filename: str):
 def label_page(request: Request):
     return templates.TemplateResponse(
         request, "label.html",
-        {"pictogram_fields": PICTOGRAM_FIELDS, "label_size_presets": LABEL_SIZE_PRESETS}
+        {"pictogram_fields": PICTOGRAM_FIELDS, "label_size_presets": LABEL_SIZE_PRESETS,
+         "label_translatable_keys": LABEL_TRANSLATABLE_KEYS}
     )
 
 

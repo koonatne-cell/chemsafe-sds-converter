@@ -27,11 +27,15 @@ def translate_text(text, source="en", target="th"):
 
 
 def translate_fields(data, keys):
-    """แปลหลายฟิลด์พร้อมกัน รับ dict ข้อมูล + list ของ key ที่ต้องการแปล คืน dict ใหม่"""
+    """แปลหลายฟิลด์พร้อมกัน รับ dict ข้อมูล + list ของ key ที่ต้องการแปล คืน dict ใหม่
+    ถ้าค่าของ key นั้นเป็น list (เช่น hazard_statements ของหน้าฉลาก) แปลทีละข้อความในลิสต์"""
     translated = dict(data)
     for k in keys:
         val = data.get(k, "")
-        translated[k] = translate_text(val)
+        if isinstance(val, list):
+            translated[k] = [translate_text(v) for v in val]
+        else:
+            translated[k] = translate_text(val)
     return translated
 
 
