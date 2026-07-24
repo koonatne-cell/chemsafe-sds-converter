@@ -295,15 +295,19 @@ def _fit_lines(val, avail_height, max_width, base_size=7, min_size=4.5):
 BLOCK_TOP_PAD = 2.5  # ขยับบรรทัดแรกลงมาเล็กน้อย กันข้อความชิดเส้นขอบบนของแถวเกินไป
 
 
-def draw_text(c, val, avail_height, max_width, size=7, single_line=False):
-    """เขียนข้อความลงตำแหน่งที่ translate ไว้แล้ว (จุดเริ่ม 0,0) พอดีกับพื้นที่ว่าง/ความกว้างจริงที่มี"""
+def draw_text(c, val, avail_height, max_width, size=7, single_line=False, center=False):
+    """เขียนข้อความลงตำแหน่งที่ translate ไว้แล้ว (จุดเริ่ม 0,0) พอดีกับพื้นที่ว่าง/ความกว้างจริงที่มี
+    center=True ใช้กับช่องแคบๆ บรรทัดเดียว (เช่น สี/กลิ่น/pH) ให้ข้อความอยู่กึ่งกลางช่องแทนชิดซ้าย"""
     if not val or val == "-":
         return
     if single_line:
         # ช่องบรรทัดเดียว (เช่น ชื่อสาร, CAS No, ชื่อผู้จัดทำ) ไม่ยอมให้ขึ้นบรรทัดใหม่
         font_size, text = _fit_single_line(val, max_width, base_size=size)
         c.setFont(FONT_REGULAR, font_size)
-        c.drawString(0, 0, text)
+        if center:
+            c.drawCentredString(max_width / 2, 0, text)
+        else:
+            c.drawString(0, 0, text)
         return
     font_size, line_height, lines = _fit_lines(val, avail_height - BLOCK_TOP_PAD, max_width, base_size=size)
     c.setFont(FONT_REGULAR, font_size)
@@ -390,7 +394,8 @@ def build_overlay(data, label_image_path=None, container_image_path=None):
     # แถบเหลือง (ชื่อสารเคมี ตัวใหญ่) / แถบแดง (Signal Word) บนหัวฟอร์ม
     draw_header_bar(c, data.get("display_name", ""), HEADER["display_name"]["top_center"], HEADER["display_name"]["size"])
     draw_header_bar(c, data.get("signal_word", ""), HEADER["signal_word"]["top_center"], HEADER["signal_word"]["size"])
-    # ช่องบรรทัดเดียว (บังคับบรรทัดเดียวเสมอ กันล้นไปทับแถวถัดไปที่ติดกันมาก)
+    # ช่องบรรทัดเดียว (บังคับบรรทัดเดียวเสมอ กันล้นไปทับแถวถัดไปที่ติดกันมาก) - วางกึ่งกลางช่อง
+    # (center=True) เพราะเป็นช่องแคบ ไม่ใช่ช่อง "ป้าย: ค่ายาว" แบบ BLOCK ชิดซ้ายแล้วดูไม่สมดุล
     for k, (x, top) in SHORT.items():
         val = (data.get(k) or "").strip()
         if val and val != "-" and k in SHORT_COVER:
@@ -398,7 +403,7 @@ def build_overlay(data, label_image_path=None, container_image_path=None):
             _cover_box(c, SHORT_COVER[k])
         c.saveState(); c.translate(x, Y(top))
         draw_text(c, data.get(k, ""), _available_height(top, data), size=7,
-                  single_line=True, max_width=_SHORT_MAX_WIDTH.get(k))
+                  single_line=True, max_width=_SHORT_MAX_WIDTH.get(k), center=True)
         c.restoreState()
     # ช่องข้อความยาว (ตัดบรรทัดแบบไทย + ลดฟอนต์อัตโนมัติถ้าจำเป็น) - ฟอนต์เริ่มต้นใหญ่ขึ้นเล็กน้อย
     # (7 -> 8) ยังลดอัตโนมัติได้ถ้าพื้นที่ไม่พอเหมือนเดิม แต่ข้อความสั้นๆ จะได้ตัวใหญ่ขึ้นเห็นชัดกว่าเดิม
