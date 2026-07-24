@@ -38,13 +38,8 @@ function fillLabelForm(data) {
     document.getElementById("f_supplier_name").value = (data.supplier_name && data.supplier_name !== "-") ? data.supplier_name : "";
     document.getElementById("f_supplier_address").value = (data.supplier_address && data.supplier_address !== "-") ? data.supplier_address : "";
     document.getElementById("f_emergency_phone").value = (data.emergency_phone && data.emergency_phone !== "-") ? data.emergency_phone : "";
-
-    if (Array.isArray(data.pictograms)) {
-        const selected = new Set(data.pictograms);
-        labelForm.querySelectorAll("input[name=pictograms]").forEach((el) => {
-            el.checked = selected.has(el.value);
-        });
-    }
+    // หมายเหตุ: ปิดการติ๊กสัญลักษณ์ GHS อัตโนมัติไว้ก่อน (เดาจากคำในไฟล์ยังไม่แม่นพอ) ให้ผู้ใช้ติ๊กเลือกเอง
+    // ทั้งหมด - ถ้าจะเปิดกลับมาทีหลัง ดึง data.pictograms ที่ backend ส่งมาแล้วก็อปมาติ๊กเหมือน app.js ได้เลย
 }
 
 function collectLabelData() {

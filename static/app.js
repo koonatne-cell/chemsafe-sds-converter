@@ -25,19 +25,15 @@ function collectFormData() {
     return data;
 }
 
-// เอา dict ข้อมูลไปใส่ในช่องฟอร์ม (รวมติ๊กสัญลักษณ์ GHS ที่ระบบเดาไว้ให้)
+// เอา dict ข้อมูลไปใส่ในช่องฟอร์ม
+// หมายเหตุ: ปิดการติ๊กสัญลักษณ์ GHS อัตโนมัติไว้ก่อน (เดาจากคำในไฟล์ยังไม่แม่นพอ) ให้ผู้ใช้ติ๊กเลือกเอง
+// ทั้งหมด - ถ้าจะเปิดกลับมาทีหลัง ดึง data.pictograms ที่ backend ส่งมาแล้วก็อปมาติ๊กเหมือนฟิลด์อื่นได้เลย
 function fillFormData(data) {
     Object.keys(data).forEach((key) => {
         if (key === "pictograms") return;
         const el = document.getElementById("f_" + key);
         if (el) el.value = data[key] ?? "";
     });
-    if (Array.isArray(data.pictograms)) {
-        const selected = new Set(data.pictograms);
-        sdsForm.querySelectorAll("input[name=pictograms]").forEach((el) => {
-            el.checked = selected.has(el.value);
-        });
-    }
 }
 
 // ---------- ขั้นตอนที่ 1: ดึงข้อมูลจาก SDS ----------
