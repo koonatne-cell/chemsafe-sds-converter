@@ -611,5 +611,6 @@ def parse_sds(pdf_path):
 
 
 if __name__ == "__main__":
+    # รันจากรากโปรเจกต์ (ไม่มี import ข้ามไฟล์ รันตรงๆ ด้วย python core/parser.py ได้เลย)
     import json
     print(json.dumps(parse_sds("getpdf_sample.pdf"), indent=2, ensure_ascii=False))

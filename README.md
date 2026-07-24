@@ -90,29 +90,37 @@ uvicorn main:app --reload
 ## โครงสร้างไฟล์
 
 ```
-main.py              หน้าเว็บ + API ทั้งหมด (FastAPI)
-parser.py            ดึงข้อมูลจาก SDS (PDF) ด้วย regex (ลองหลาย pattern ต่อฟิลด์)
-fill_template.py     วางข้อมูล+รูปภาพลงบน Template.pdf (ฝังฟอนต์ไทย) ใช้งานจริงตอนนี้
-label_template.py    วาดฉลากภาชนะบรรจุสารเคมีขึ้นใหม่ (ไม่ใช้ Template.pdf) หน้า /label
-translator.py        แปลอังกฤษ -> ไทย
-database.py          จัดการฐานข้อมูล SQLite (ทะเบียนสารเคมี)
-auth.py              เช็ครหัสผู้ดูแล
-fields.py            รายชื่อฟิลด์ทั้งหมด จัดกลุ่ม+ป้ายภาษาไทย (รวมช่องจัดทำโดย/อนุมัติโดย, สัญลักษณ์ GHS,
-                      ขนาดฉลากที่เลือกได้ใน LABEL_SIZE_PRESETS)
-templates/           หน้าเว็บ (HTML) - index.html (SDS ติดหน้างาน), label.html (ฉลากภาชนะบรรจุ)
-static/              CSS + JavaScript (app.js = หน้าแรก, label.js = หน้าฉลาก)
+main.py               หน้าเว็บ + API ทั้งหมด (FastAPI) - จุดเริ่มรัน uvicorn main:app อยู่ที่รากโปรเจกต์เท่านั้น
+
+core/                 โมดูลตรรกะหลัก (ไม่เกี่ยวกับการวาด PDF)
+  parser.py             ดึงข้อมูลจาก SDS (PDF) ด้วย regex (ลองหลาย pattern ต่อฟิลด์)
+  translator.py         แปลอังกฤษ -> ไทย
+  database.py           จัดการฐานข้อมูล SQLite (ทะเบียนสารเคมี)
+  auth.py               เช็ครหัสผู้ดูแล
+  fields.py             รายชื่อฟิลด์ทั้งหมด จัดกลุ่ม+ป้ายภาษาไทย (รวมช่องจัดทำโดย, สัญลักษณ์ GHS,
+                         ขนาดฉลากที่เลือกได้ใน LABEL_SIZE_PRESETS, ชื่อผู้อนุมัติคงที่ใน APPROVED_NAME)
+
+pdf_gen/               โมดูลวาด/สร้างไฟล์ PDF (และ Excel เดิม)
+  fill_template.py      วางข้อมูล+รูปภาพลงบน Template.pdf (ฝังฟอนต์ไทย) ใช้งานจริงตอนนี้
+  label_template.py     วาดฉลากภาชนะบรรจุสารเคมีขึ้นใหม่ (ไม่ใช้ Template.pdf) หน้า /label
+  fill_excel.py          -- เคยลองสลับไปใช้ Excel เป็นเอาต์พุตแทน PDF แต่กลับมาใช้ PDF เหมือนเดิม
+                         เก็บโค้ดไว้เผื่ออยากกลับไปใช้ในอนาคต ไม่ได้เรียกจากหน้าเว็บแล้ว --
+
+templates/            หน้าเว็บ (HTML) - index.html (SDS ติดหน้างาน), label.html (ฉลากภาชนะบรรจุ)
+static/               CSS + JavaScript (app.js = หน้าแรก, label.js = หน้าฉลาก)
 static/ghs_icons/         ไอคอนสัญลักษณ์ GHS 9 ชนิด (สำเนาไว้ให้หน้าเว็บโหลดแสดงเป็น checkbox)
 assets/Template.pdf       แม่แบบฟอร์ม SDS ติดหน้างาน (ห้ามลบ)
 assets/template_backups/  ไฟล์ Template.pdf เก่าที่สำรองไว้ตอน Admin อัปโหลดตัวใหม่
 assets/fonts/             ฟอนต์ไทยที่ฝังใน PDF (Noto Sans Thai, ฟรี, แจกจ่ายต่อได้ตามกฎหมาย)
 assets/ghs_icons/         ไอคอนสัญลักษณ์ GHS 9 ชนิด ต้นฉบับ (ใช้วาดลง PDF จริงตอนสร้าง)
+assets/Template.xlsx      แม่แบบฟอร์มแบบ Excel (ตัดมาจากไฟล์ต้นแบบจริงของบริษัท ใช้กับ pdf_gen/fill_excel.py)
 data/                 ฐานข้อมูล + ไฟล์ที่ผู้ใช้อัปโหลด/สร้าง (สร้างอัตโนมัติตอนรันครั้งแรก)
-
--- เคยลองสลับไปใช้ Excel เป็นเอาต์พุตแทน PDF แต่กลับมาใช้ PDF เหมือนเดิม โค้ดฝั่ง Excel
-   ยังเก็บไว้เผื่ออยากกลับไปใช้ในอนาคต แต่ไม่ได้เรียกจากหน้าเว็บแล้ว --
-fill_excel.py         วางข้อมูล+รูปภาพลงบน Template.xlsx ด้วย openpyxl
-assets/Template.xlsx   แม่แบบฟอร์มแบบ Excel (ตัดมาจากไฟล์ต้นแบบจริงของบริษัท)
 ```
+
+**หมายเหตุ:** `core/` และ `pdf_gen/` เป็น Python package (มี `__init__.py`) รันไฟล์เดี่ยวๆ ข้างในเพื่อทดสอบ
+ต้องรันจากรากโปรเจกต์ด้วย `python -m` เท่านั้น (เช่น `python -m pdf_gen.fill_template`) ไม่ใช่รันตรงๆ
+ด้วย path (เช่น `python pdf_gen/fill_template.py`) เพราะ import ข้ามโฟลเดอร์ (เช่น `from core.parser import ...`)
+ต้องอาศัยการรันแบบ package ถึงจะ resolve ได้ถูกต้อง
 
 ## หมายเหตุสำคัญ
 

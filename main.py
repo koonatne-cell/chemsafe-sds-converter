@@ -26,13 +26,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-import database
-import auth
-from parser import parse_sds
-from translator import translate_fields
-from fill_template import fill_from_data
-from label_template import fill_label
-from fields import (FIELD_GROUPS, SIGNATURE_FIELDS, PICTOGRAM_FIELDS,
+from core import database
+from core import auth
+from core.parser import parse_sds
+from core.translator import translate_fields
+from pdf_gen.fill_template import fill_from_data
+from pdf_gen.label_template import fill_label
+from core.fields import (FIELD_GROUPS, SIGNATURE_FIELDS, PICTOGRAM_FIELDS,
                      NFPA_SPECIAL_OPTIONS, TRANSLATABLE_KEYS, ALL_KEYS,
                      LABEL_SIZE_PRESETS, LABEL_TRANSLATABLE_KEYS,
                      APPROVED_NAME, APPROVED_POSITION)

@@ -19,7 +19,9 @@ from openpyxl.styles import Alignment
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.drawing.spreadsheet_drawing import TwoCellAnchor, AnchorMarker
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+# PROJECT_ROOT ต้องขึ้นไปอีก 1 ชั้นจากไฟล์นี้ เพราะย้ายเข้ามาอยู่ใน pdf_gen/ แล้ว (ไม่ได้ใช้ตัวแปรนี้
+# ที่ไหนตอนนี้ แต่แก้ไว้เผื่ออนาคต - ดู pdf_gen/fill_template.py สำหรับเหตุผลเดียวกัน)
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHEET_NAME = "1.00.05"
 
 # แผนที่ field key -> ตำแหน่ง cell จริงในเทมเพลต (วัดจากไฟล์ต้นแบบของบริษัท)
@@ -118,7 +120,8 @@ def fill_from_data(data, template_path, out_path, label_image_path=None, contain
 
 
 if __name__ == "__main__":
-    from parser import parse_sds
+    # รันจากรากโปรเจกต์ด้วย: python -m pdf_gen.fill_excel (import แบบ package ต้องใช้ -m)
+    from core.parser import parse_sds
     data = parse_sds("getpdf_sample.pdf") if os.path.exists("getpdf_sample.pdf") else {}
     fill_from_data(data, "assets/Template.xlsx", "data/generated/test_output.xlsx")
     print("saved test_output.xlsx")

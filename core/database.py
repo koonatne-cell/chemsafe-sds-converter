@@ -8,8 +8,10 @@ import os
 import sqlite3
 from datetime import datetime
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(HERE, "data", "chemsafe.db")
+# PROJECT_ROOT ต้องขึ้นไปอีก 1 ชั้นจากไฟล์นี้ เพราะย้ายเข้ามาอยู่ใน core/ แล้ว
+# แต่โฟลเดอร์ data/ (runtime, ไม่ใช่โค้ด) ยังอยู่ที่รากโปรเจกต์เหมือนเดิม
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(PROJECT_ROOT, "data", "chemsafe.db")
 
 
 def get_connection():

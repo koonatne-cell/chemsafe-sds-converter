@@ -24,7 +24,9 @@ from pypdf import PdfReader, PdfWriter
 from pythainlp.tokenize import word_tokenize
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+# PROJECT_ROOT ต้องขึ้นไปอีก 1 ชั้นจากไฟล์นี้ เพราะย้ายเข้ามาอยู่ใน pdf_gen/ แล้ว
+# แต่โฟลเดอร์ assets/ (ฟอนต์, ไอคอน, เทมเพลต) ยังอยู่ที่รากโปรเจกต์เหมือนเดิม
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE_W, PAGE_H = 595.32, 841.92   # ขนาดหน้าเทมเพลต (points)
 
 # ---------- ฟอนต์ไทย ----------
@@ -480,7 +482,8 @@ def fill_from_data(data, template_path, out_path,
 
 
 if __name__ == "__main__":
-    from parser import parse_sds
+    # รันจากรากโปรเจกต์ด้วย: python -m pdf_gen.fill_template (import แบบ package ต้องใช้ -m)
+    from core.parser import parse_sds
     data = parse_sds("getpdf_sample.pdf")
     fill_from_data(data, "assets/Template.pdf", "data/generated/test_output.pdf")
     print("saved test_output.pdf")

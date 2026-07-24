@@ -23,7 +23,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
-from fill_template import (
+from pdf_gen.fill_template import (
     register_thai_fonts, FONT_REGULAR, FONT_BOLD,
     wrap_thai, PICTOGRAM_ICON_DIR, PICTOGRAM_ORDER,
 )
@@ -258,7 +258,8 @@ def fill_label(data, size_key, size_presets, out_path):
 
 
 if __name__ == "__main__":
-    from fields import LABEL_SIZE_PRESETS
+    # รันจากรากโปรเจกต์ด้วย: python -m pdf_gen.label_template (import แบบ package ต้องใช้ -m)
+    from core.fields import LABEL_SIZE_PRESETS
     sample = {
         "product_name": "Sodium Hydroxide 50%",
         "cas": "1310-73-2",
