@@ -34,7 +34,8 @@ from fill_template import fill_from_data
 from label_template import fill_label
 from fields import (FIELD_GROUPS, SIGNATURE_FIELDS, PICTOGRAM_FIELDS,
                      NFPA_SPECIAL_OPTIONS, TRANSLATABLE_KEYS, ALL_KEYS,
-                     LABEL_SIZE_PRESETS, LABEL_TRANSLATABLE_KEYS)
+                     LABEL_SIZE_PRESETS, LABEL_TRANSLATABLE_KEYS,
+                     APPROVED_NAME, APPROVED_POSITION)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PDF = os.path.join(HERE, "assets", "Template.pdf")
@@ -133,6 +134,10 @@ async def api_generate(
     # ให้ทุกฟิลด์ที่ระบบรู้จักมีค่าเสมอ (กันแอปพังถ้าฝั่ง frontend ส่งมาไม่ครบ)
     for key in ALL_KEYS:
         field_data.setdefault(key, "-")
+
+    # "อนุมัติโดย" เป็นคนเดิมทุกครั้ง (ตัดออกจากฟอร์มแล้ว) บังคับค่านี้เสมอไม่ว่า frontend จะส่งอะไรมา
+    field_data["approved_name"] = APPROVED_NAME
+    field_data["approved_position"] = APPROVED_POSITION
 
     label_image_filename = None
     container_image_filename = None

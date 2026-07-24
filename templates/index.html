@@ -20,9 +20,10 @@
     <div id="sdsForm">
 
     <div class="card">
-        <div class="step-label">ข้อมูลผู้จัดทำ / ผู้อนุมัติ (กรอกก่อนเริ่มก็ได้ ไม่บังคับ)</div>
+        <div class="step-label">ข้อมูลผู้จัดทำ (กรอกก่อนเริ่มก็ได้ ไม่บังคับ)</div>
         <fieldset>
-            <legend>สำหรับพิมพ์ลงท้ายฟอร์ม SDS ติดหน้างาน</legend>
+            <legend>สำหรับพิมพ์ลงท้ายฟอร์ม SDS ติดหน้างาน (ผู้อนุมัติเป็น EHS Manager คนเดิมทุกครั้ง
+                ไม่ต้องกรอก ระบบใส่ให้อัตโนมัติ)</legend>
             {% for key, label in signature_fields %}
             <div class="field-row">
                 <label for="f_{{ key }}">{{ label }}</label>
