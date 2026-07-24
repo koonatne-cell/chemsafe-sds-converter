@@ -208,6 +208,8 @@ async def api_label_generate(data: UploadFile = File(...)):
     except Exception as ex:
         raise HTTPException(status_code=500, detail=f"สร้างฉลากไม่ได้: {ex}")
 
+    database.add_label_record(field_data, size_key, out_filename)
+
     return JSONResponse({"download_url": f"/download/{out_filename}"})
 
 
@@ -220,8 +222,9 @@ def admin_page(request: Request):
     if not auth.is_admin(request):
         return RedirectResponse("/admin/login")
     records = database.list_records()
+    stats = database.get_dashboard_stats()
     return templates.TemplateResponse(
-        request, "admin.html", {"records": records}
+        request, "admin.html", {"records": records, "stats": stats}
     )
 
 

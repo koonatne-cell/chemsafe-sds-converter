@@ -172,6 +172,38 @@ th { color: #1f5c99; }
 
 .hidden { display: none !important; }
 
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 14px 0;
+}
+.stat-card {
+    background: #f4f6f8;
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+}
+.stat-number {
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: #1f5c99;
+}
+.stat-label {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 4px;
+}
+
+.chart-scroll { overflow-x: auto; }
+.bar-chart {
+    width: 100%;
+    min-width: 500px;
+    height: 150px;
+}
+.chart-count { font-size: 8px; fill: #1f5c99; font-weight: bold; }
+.chart-date { font-size: 8px; fill: #888; }
+
 .login-box {
     max-width: 360px;
     margin: 80px auto;

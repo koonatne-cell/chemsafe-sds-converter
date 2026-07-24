@@ -18,6 +18,66 @@
 </header>
 <main>
     <div class="card">
+        <div class="step-label">ภาพรวมการใช้งาน (Dashboard)</div>
+        <p style="font-size:0.8rem; color:#888; margin-top:0;">
+            นับจากจำนวนครั้งที่ "สร้าง PDF" สำเร็จ (ทั้งฟอร์ม SDS ติดหน้างาน และฉลากภาชนะบรรจุ) ระบบไม่ได้
+            เก็บ log จำนวนคนเข้าเว็บ เพราะไม่จำเป็นสำหรับงานนี้และเป็นข้อมูลที่ต้องระวังเรื่องความเป็นส่วนตัว
+            ถ้า deploy บน Render free tier ตัวเลขจะรีเซ็ตทุกครั้งที่ redeploy (พื้นที่เก็บข้อมูลไม่ถาวร)
+        </p>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.total_sds + stats.total_labels }}</div>
+                <div class="stat-label">สร้าง PDF ทั้งหมด</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.today_sds + stats.today_labels }}</div>
+                <div class="stat-label">วันนี้</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.week_sds + stats.week_labels }}</div>
+                <div class="stat-label">7 วันล่าสุด</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.total_sds }} / {{ stats.total_labels }}</div>
+                <div class="stat-label">ฟอร์ม SDS / ฉลากภาชนะ</div>
+            </div>
+        </div>
+
+        <div class="step-label" style="margin-top:20px; font-size:0.95rem;">กิจกรรม 14 วันล่าสุด</div>
+        <div class="chart-scroll">
+            <svg viewBox="0 0 700 130" class="bar-chart" preserveAspectRatio="none">
+                {% for d in stats.daily_activity %}
+                {% set slot_w = 700 / 14 %}
+                {% set bar_w = 30 %}
+                {% set bar_h = (d.count / stats.max_daily * 90) if d.count > 0 else 0 %}
+                {% set bar_x = loop.index0 * slot_w + (slot_w - bar_w) / 2 %}
+                <rect x="{{ bar_x }}" y="{{ 100 - bar_h }}" width="{{ bar_w }}" height="{{ bar_h if bar_h > 0 else 1 }}"
+                      fill="#1f5c99" rx="2"></rect>
+                {% if d.count > 0 %}
+                <text x="{{ bar_x + bar_w/2 }}" y="{{ 100 - bar_h - 4 }}" text-anchor="middle" class="chart-count">{{ d.count }}</text>
+                {% endif %}
+                <text x="{{ bar_x + bar_w/2 }}" y="118" text-anchor="middle" class="chart-date">{{ d.date }}</text>
+                {% endfor %}
+            </svg>
+        </div>
+
+        <div class="step-label" style="margin-top:20px; font-size:0.95rem;">สารเคมีที่สร้างบ่อยที่สุด</div>
+        {% if stats.top_chemicals %}
+        <table>
+            <thead><tr><th>ชื่อสารเคมี</th><th>จำนวนครั้ง</th></tr></thead>
+            <tbody>
+                {% for t in stats.top_chemicals %}
+                <tr><td>{{ t.name }}</td><td>{{ t.cnt }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="font-size:0.85rem; color:#888;">ยังไม่มีข้อมูล</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
         <div class="step-label">เปลี่ยนเทมเพลต SDS ติดหน้างาน (Template.pdf)</div>
         <p style="font-size:0.85rem; color:#666; margin-top:0;">
             ใช้ได้เฉพาะไฟล์ที่โครงสร้าง/ตำแหน่งช่องเหมือนเทมเพลตเดิม (เช่น เปลี่ยนแค่ชื่อบริษัท โลโก้ เลขเอกสาร)
