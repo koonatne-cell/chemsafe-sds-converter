@@ -436,6 +436,7 @@ def extract_supplier_info(text):
         line(r"Company"), line(r"Company [Nn]ame"),
         line(r"Supplier"), line(r"Manufacturer"),
         line(r"ชื่อบริษัท"), line(r"ผู้ผลิต"), line(r"ผู้จำหน่าย"),
+        line(r"บริษัท"),  # ป้ายสั้นๆ แค่ "บริษัท" เจอใน SDS ตระกูล Sika/CPAC/LANKO ไว้ลองท้ายสุด
     ])
     address = grab(section1, [
         block(r"Address"), block(r"Street [Aa]ddress"),
@@ -448,7 +449,8 @@ def extract_supplier_info(text):
                or _raw_block(section1, r"Supplier")
                or _raw_block(section1, r"Manufacturer")
                or _raw_block(section1, r"ผู้ผลิต")
-               or _raw_block(section1, r"ผู้จำหน่าย"))
+               or _raw_block(section1, r"ผู้จำหน่าย")
+               or _raw_block(section1, r"บริษัท"))
         if raw:
             lines = [ln.strip() for ln in raw.split("\n") if ln.strip()]
             if name == "-" and lines:
@@ -528,6 +530,10 @@ def parse_sds(pdf_path):
         block(r"Recommended use"),
         block(r"Product use"),
         block(r"Uses of the [Ss]ubstance.*?"),
+        # ต้องลองแบบมี "ผลิตภัณฑ์"/"วิธี" ต่อท้าย/นำหน้าก่อน (พบใน SDS ตระกูล Sika/CPAC/LANKO
+        # เช่น "วิธีการใช้งานผลิตภัณฑ์ :") เพราะ pattern ทั่วไปด้านล่างต้องมี ":" ติดกับ "การใช้งาน"
+        # เป๊ะ ถ้ามีคำอื่นคั่นก่อนโคลอน (เช่น "ผลิตภัณฑ์") จะไม่แมตช์
+        block(r"วิธีการใช้งานผลิตภัณฑ์"),
         block(r"(?:ลักษณะ|วัตถุประสงค์)?การใช้งาน"),
     ])
     d["state"] = grab(t, [
@@ -552,18 +558,22 @@ def parse_sds(pdf_path):
     # Section 4 (การปฐมพยาบาล) - ค้นในช่วง Section 4 ก่อน กันไปจับ Section 11 (พิษวิทยา) ผิด
     # ป้ายเปล่าๆ อย่าง "Eyes:"/"Skin:"/"Ingestion:"/"Inhalation:" ต้องยึดให้อยู่ต้นบรรทัดเท่านั้น
     # (ไม่งั้น "After inhalation:" จะโดนจับซ้อนเพราะมีคำว่า "inhalation:" อยู่ข้างในเป็น substring)
+    # "หากหายใจเข้าไป"/"ในกรณีที่เข้าตา" ฯลฯ พบใน SDS ตระกูล Sika/CPAC/LANKO (คนละสำนวนกับ "ทางตา"
+    # ที่เจอในเอกสารอื่น) เป็นการเขียนแบบ "ถ้าเกิดเหตุการณ์...ให้ทำอย่างไร" แทนการระบุอวัยวะตรงๆ
     d["fa_eye"] = grab_scoped(t, section4, [
         block(r"After eye contact"),
         block(r"Eye [Cc]ontact"),
         block(r"If in eyes"),
         block(r"(?:^|\n)\s*Eyes"),
         block(r"(?:^|\n)\s*ทางตา"),
+        block(r"ในกรณีที่เข้าตา"), block(r"ในกรณีที่สัมผัสกับตา"), block(r"หากเข้าตา"),
     ])
     d["fa_oral"] = grab_scoped(t, section4, [
         block(r"After swallowing"),
         block(r"If [Ss]wallowed"),
         block(r"(?:^|\n)\s*Ingestion"),
         block(r"(?:^|\n)\s*ทางปาก"), block(r"(?:กรณี)?การกลืนกิน"),
+        block(r"หากกลืนกิน(?:เข้าไป)?"),
     ])
     d["fa_skin"] = grab_scoped(t, section4, [
         block(r"After skin contact"),
@@ -571,33 +581,40 @@ def parse_sds(pdf_path):
         block(r"If on skin"),
         block(r"(?:^|\n)\s*Skin"),
         block(r"(?:^|\n)\s*ทางผิวหนัง"),
+        block(r"ในกรณีที่สัมผัสกับผิวหนัง"), block(r"หากสัมผัสผิวหนัง"),
     ])
     d["fa_inhale"] = grab_scoped(t, section4, [
         block(r"After inhalation"),
         block(r"If [Ii]nhaled"),
         block(r"(?:^|\n)\s*Inhalation"),
         block(r"(?:^|\n)\s*ทางการหายใจ"), block(r"การหายใจเข้าไป"), block(r"การสูดดม"),
+        block(r"หากหายใจเข้าไป"),
     ])
     # Section 11 (พิษวิทยา) - ค้นในช่วง Section 11 ก่อน กันไปจับ Section 4 (ปฐมพยาบาล) ผิด
+    # SDS ตระกูล Sika/CPAC/LANKO ใช้สำนวน "เมื่อ..." (เมื่อเข้าตา/เมื่อสัมผัสกับผิวหนัง ฯลฯ) แทน
     d["hz_eye"] = grab_scoped(t, section11, [
         block(r"on the eye"),
         block(r"Eye [Ii]rritation"),
         block(r"(?:^|\n)\s*Eyes"),
         block(r"(?:^|\n)\s*ทางตา"),
+        block(r"เมื่อเข้าตา"), block(r"เมื่อสัมผัสกับตา"),
     ])
     d["hz_skin"] = grab_scoped(t, section11, [
         block(r"on the skin"),
         block(r"Skin [Ii]rritation"),
         block(r"(?:^|\n)\s*Skin"),
         block(r"(?:^|\n)\s*ทางผิวหนัง"),
+        block(r"เมื่อสัมผัสกับผิวหนัง"),
     ])
     d["hz_oral"] = grab_scoped(t, section11, [
         block(r"(?:^|\n)\s*Ingestion"),
         block(r"(?:^|\n)\s*ทางปาก"),
+        block(r"เมื่อกลืนกินเข้าไป"), block(r"เมื่อกลืนกิน"),
     ])
     d["hz_inhale"] = grab_scoped(t, section11, [
         block(r"(?:^|\n)\s*Inhalation"),
         block(r"(?:^|\n)\s*ทางการหายใจ"), block(r"การสูดดม"),
+        block(r"เมื่อหายใจเข้าไป"),
     ])
     d["fire"] = grab(t, [
         block(r"Suitable extinguishing agents"),
