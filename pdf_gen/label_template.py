@@ -295,19 +295,8 @@ def build_label_pdf(data, size_key, size_presets, out_path, orientation="portrai
             _draw_statements_in_box(c, data.get("precautionary_statements"), inner_x, inner_y, inner_w, inner_h,
                                     height_pt, body_size)
         elif num == "7":
-            supplier_name = (data.get("supplier_name") or "").strip()
-            supplier_address = (data.get("supplier_address") or "").strip()
-            emergency_phone = (data.get("emergency_phone") or "").strip()
-            ny = inner_y
-            if supplier_name and supplier_name != "-":
-                ny = _draw_paragraph_in_box(c, supplier_name, inner_x, ny, inner_w, inner_h - (ny - inner_y),
-                                            height_pt, max(7, 9 * scale), bold=True)
-            if supplier_address and supplier_address != "-":
-                ny = _draw_paragraph_in_box(c, supplier_address, inner_x, ny, inner_w, inner_h - (ny - inner_y),
-                                            height_pt, body_size)
-            if emergency_phone and emergency_phone != "-":
-                _draw_paragraph_in_box(c, f"Emergency: {emergency_phone}", inner_x, ny, inner_w,
-                                       inner_h - (ny - inner_y), height_pt, body_size)
+            _draw_paragraph_in_box(c, data.get("supplier_name"), inner_x, inner_y, inner_w, inner_h,
+                                   height_pt, max(9, 12 * scale), center=True, bold=True)
 
         y += this_box_h + gap_after_box
 
@@ -345,8 +334,6 @@ if __name__ == "__main__":
             "Seek emergency medical aid immediately.",
         ],
         "supplier_name": "Apex Chemical Corp.",
-        "supplier_address": "123 Industrial Estate, Chonburi 20000",
-        "emergency_phone": "1-800-555-CHEM",
     }
     fill_label(sample, "medium", LABEL_SIZE_PRESETS, "data/generated/test_label.pdf")
     print("saved test_label.pdf")

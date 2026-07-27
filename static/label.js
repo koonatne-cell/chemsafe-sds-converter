@@ -42,8 +42,6 @@ function fillLabelForm(data) {
     document.getElementById("f_hazard_statements").value = listToLines(data.hazard_statements);
     document.getElementById("f_precautionary_statements").value = listToLines(data.precautionary_statements);
     document.getElementById("f_supplier_name").value = (data.supplier_name && data.supplier_name !== "-") ? data.supplier_name : "";
-    document.getElementById("f_supplier_address").value = (data.supplier_address && data.supplier_address !== "-") ? data.supplier_address : "";
-    document.getElementById("f_emergency_phone").value = (data.emergency_phone && data.emergency_phone !== "-") ? data.emergency_phone : "";
     // หมายเหตุ: ปิดการติ๊กสัญลักษณ์ GHS อัตโนมัติไว้ก่อน (เดาจากคำในไฟล์ยังไม่แม่นพอ) ให้ผู้ใช้ติ๊กเลือกเอง
     // ทั้งหมด - ถ้าจะเปิดกลับมาทีหลัง ดึง data.pictograms ที่ backend ส่งมาแล้วก็อปมาติ๊กเหมือน app.js ได้เลย
 }
@@ -58,8 +56,6 @@ function collectLabelData() {
         hazard_statements: linesToList(document.getElementById("f_hazard_statements").value),
         precautionary_statements: linesToList(document.getElementById("f_precautionary_statements").value),
         supplier_name: document.getElementById("f_supplier_name").value,
-        supplier_address: document.getElementById("f_supplier_address").value,
-        emergency_phone: document.getElementById("f_emergency_phone").value,
         size_key: labelSize.value,
         orientation: document.querySelector("input[name=orientation]:checked").value,
         custom_width_mm: document.getElementById("customWidth").value,

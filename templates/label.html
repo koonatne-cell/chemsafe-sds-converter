@@ -36,7 +36,7 @@
         <fieldset>
             <legend>ข้อมูลหลัก</legend>
             <div class="field-row">
-                <label for="f_product_name">ชื่อผลิตภัณฑ์ (Product identifier)</label>
+                <label for="f_product_name">ชื่อผลิตภัณฑ์ (Product Name)</label>
                 <textarea id="f_product_name" name="product_name" rows="2"></textarea>
             </div>
             <div class="field-row">
@@ -48,14 +48,13 @@
                 <input type="text" id="f_un" name="un">
             </div>
             <div class="field-row">
-                <label for="f_signal_word">คำสัญญาณ (Signal word)</label>
+                <label for="f_signal_word">คำสัญญาณ (Signal Words)</label>
                 <input type="text" id="f_signal_word" name="signal_word">
             </div>
         </fieldset>
 
         <fieldset>
-            <legend>สารเคมีอันตราย (Hazardous substances - ระบบลองดึงจากตารางส่วนผสม Section 3 ให้ก่อน
-                เรียงจาก % สูงสุด บรรทัดละ 1 ชื่อ แก้ไข/เพิ่มเองได้)</legend>
+            <legend>สารเคมีอันตราย (Hazardous Substances)</legend>
             <div class="field-row">
                 <textarea id="f_hazardous_substances" name="hazardous_substances" rows="3"
                           placeholder="เช่น Sodium hydroxide"></textarea>
@@ -63,7 +62,7 @@
         </fieldset>
 
         <fieldset>
-            <legend>สัญลักษณ์ GHS (Hazard pictograms) - ติ๊กเลือกเอง ดูจาก Section 2 ของ SDS</legend>
+            <legend>รูปสัญลักษณ์ (GHS Pictograms)</legend>
             <div class="pictogram-grid">
                 {% for key, label in pictogram_fields %}
                 <label class="pictogram-item">
@@ -76,7 +75,7 @@
         </fieldset>
 
         <fieldset>
-            <legend>Hazard statements (ระบบลองดึงจาก Section 2 ให้ก่อน แก้ไข/เพิ่มเองได้ บรรทัดละ 1 ข้อ)</legend>
+            <legend>ข้อความแสดงอันตราย (Hazard Statements)</legend>
             <div class="field-row">
                 <textarea id="f_hazard_statements" name="hazard_statements" rows="4"
                           placeholder="เช่น H314 Causes severe skin burns and eye damage."></textarea>
@@ -84,7 +83,7 @@
         </fieldset>
 
         <fieldset>
-            <legend>Precautionary statements (บรรทัดละ 1 ข้อ)</legend>
+            <legend>ข้อความระวัง (Precautionary Statements)</legend>
             <div class="field-row">
                 <textarea id="f_precautionary_statements" name="precautionary_statements" rows="4"
                           placeholder="เช่น P280 Wear protective gloves/eye protection."></textarea>
@@ -92,18 +91,10 @@
         </fieldset>
 
         <fieldset>
-            <legend>ข้อมูลผู้ผลิต/ผู้จำหน่าย (Supplier identification)</legend>
+            <legend>ผู้ผลิต (Manufacturing)</legend>
             <div class="field-row">
                 <label for="f_supplier_name">ชื่อบริษัท</label>
                 <input type="text" id="f_supplier_name" name="supplier_name">
-            </div>
-            <div class="field-row">
-                <label for="f_supplier_address">ที่อยู่</label>
-                <textarea id="f_supplier_address" name="supplier_address" rows="2"></textarea>
-            </div>
-            <div class="field-row">
-                <label for="f_emergency_phone">เบอร์โทรฉุกเฉิน</label>
-                <input type="text" id="f_emergency_phone" name="emergency_phone">
             </div>
         </fieldset>
 
