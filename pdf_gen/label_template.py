@@ -82,17 +82,34 @@ def _draw_statement(c, text, x, y_top, max_width, font_size, line_gap=1.5):
     return y
 
 
-def build_label_pdf(data, size_key, size_presets, out_path):
+def build_label_pdf(data, size_key, size_presets, out_path, orientation="portrait"):
     """
     สร้างฉลากภาชนะบรรจุ 1 หน้า ขนาดตาม size_key (ต้องตรงกับ key ใน size_presets)
     size_presets: list ของ (key, label, width_mm, height_mm) เหมือนใน fields.LABEL_SIZE_PRESETS
     data: dict ข้อมูลฉลาก (product_name, cas, un, signal_word, pictograms, hazard_statements,
-          precautionary_statements, supplier_name, supplier_address, emergency_phone, supplemental_info)
+          precautionary_statements, supplier_name, supplier_address, emergency_phone, supplemental_info,
+          custom_width_mm/custom_height_mm ถ้า size_key="custom")
+    orientation: "portrait" (แนวตั้ง, ค่าเริ่มต้น) หรือ "landscape" (แนวนอน - สลับกว้าง/สูง)
     """
     register_thai_fonts()
 
     preset = next((p for p in size_presets if p[0] == size_key), size_presets[0])
     _, _, width_mm, height_mm = preset
+    if width_mm is None or height_mm is None:
+        # "custom" ไม่มีขนาดตายตัวใน preset - ผู้ใช้กรอกกว้าง/สูงเองมาใน data
+        # ถ้ากรอกไม่ใช่ตัวเลข (หรือว่างไว้) fallback เป็นขนาด "กลาง" กันสร้าง PDF พังไปเลย
+        try:
+            width_mm = float(data.get("custom_width_mm") or 100)
+        except (TypeError, ValueError):
+            width_mm = 100
+        try:
+            height_mm = float(data.get("custom_height_mm") or 150)
+        except (TypeError, ValueError):
+            height_mm = 150
+        width_mm = max(20, width_mm)
+        height_mm = max(20, height_mm)
+    if orientation == "landscape":
+        width_mm, height_mm = height_mm, width_mm
     scale = _scale_for(width_mm)
 
     width_pt, height_pt = width_mm * mm, height_mm * mm
@@ -249,9 +266,9 @@ def build_label_pdf(data, size_key, size_presets, out_path):
     return buf
 
 
-def fill_label(data, size_key, size_presets, out_path):
+def fill_label(data, size_key, size_presets, out_path, orientation="portrait"):
     """สร้างไฟล์ PDF ฉลาก แล้วเซฟลง out_path"""
-    buf = build_label_pdf(data, size_key, size_presets, out_path)
+    buf = build_label_pdf(data, size_key, size_presets, out_path, orientation=orientation)
     with open(out_path, "wb") as f:
         f.write(buf.read())
     return out_path

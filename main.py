@@ -200,11 +200,12 @@ async def api_label_generate(data: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="ข้อมูลฟอร์มไม่ถูกต้อง")
 
     size_key = field_data.get("size_key", LABEL_SIZE_PRESETS[0][0])
+    orientation = field_data.get("orientation", "portrait")
     out_filename = _safe_filename("label.pdf", "label")
     out_path = os.path.join(GENERATED_DIR, out_filename)
 
     try:
-        fill_label(field_data, size_key, LABEL_SIZE_PRESETS, out_path)
+        fill_label(field_data, size_key, LABEL_SIZE_PRESETS, out_path, orientation=orientation)
     except Exception as ex:
         raise HTTPException(status_code=500, detail=f"สร้างฉลากไม่ได้: {ex}")
 

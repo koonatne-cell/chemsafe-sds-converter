@@ -9,6 +9,12 @@ const generateStatus = document.getElementById("generateStatus");
 const downloadLink = document.getElementById("downloadLink");
 const labelForm = document.getElementById("labelForm");
 const labelSize = document.getElementById("labelSize");
+const customSizeRow = document.getElementById("customSizeRow");
+
+// แสดงช่องกรอกกว้าง/สูงเองเฉพาะตอนเลือก "กำหนดขนาดเอง" เท่านั้น
+labelSize.addEventListener("change", () => {
+    customSizeRow.classList.toggle("hidden", labelSize.value !== "custom");
+});
 
 function setStatus(el, text, kind) {
     el.textContent = text;
@@ -56,6 +62,9 @@ function collectLabelData() {
         emergency_phone: document.getElementById("f_emergency_phone").value,
         supplemental_info: document.getElementById("f_supplemental_info").value,
         size_key: labelSize.value,
+        orientation: document.querySelector("input[name=orientation]:checked").value,
+        custom_width_mm: document.getElementById("customWidth").value,
+        custom_height_mm: document.getElementById("customHeight").value,
     };
     data.pictograms = Array.from(
         labelForm.querySelectorAll("input[name=pictograms]:checked")
