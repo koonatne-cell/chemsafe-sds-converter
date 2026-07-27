@@ -212,6 +212,29 @@ def parse_cas_from_composition_table(text):
     return best_cas
 
 
+def parse_ingredient_name_from_composition_table(text):
+    """
+    หาชื่อสารเคมีของแถวที่มี Concentration (%) สูงสุดในตาราง Section 3 (แถวเดียวกับที่
+    parse_cas_from_composition_table() เลือก CAS มา - ใช้ตรรกะ "สูงสุด" แบบเดียวกันเป๊ะ เพื่อให้
+    ชื่อกับ CAS ที่แสดงคู่กันบนฟอร์มเป็นสารตัวเดียวกันเสมอ ไม่ใช่คนละแถวโดยไม่ได้ตั้งใจ)
+    คืน None ถ้าหาตารางแบบนี้ไม่เจอ (SDS สารเดี่ยว ไม่มีตารางส่วนผสม)
+    """
+    section3 = extract_section(text, 3)
+    if not section3:
+        return None
+    best_score, best_name = None, None
+    for m in _CAS_TABLE_ROW.finditer(section3):
+        nums = [float(x) for x in re.findall(r"[\d.]+", m.group("conc"))]
+        if not nums:
+            continue
+        score = max(nums)
+        if best_score is None or score > best_score:
+            name = _clean(m.group("name")) or m.group("name").strip()
+            if name:
+                best_score, best_name = score, name
+    return best_name
+
+
 def extract_hazardous_substances(text):
     """
     ดึงชื่อสารเคมีอันตราย (ไม่ใช่แค่เลข CAS) จากตาราง "ส่วนประกอบ" ใน Section 3 - ใช้สำหรับบรรทัด
@@ -514,6 +537,10 @@ def parse_sds(pdf_path):
         r"CAS Registry Number\s*:\s*\n?\s*([\d\-]+)",
         r"(?:เลขทะเบียน|หมายเลข)\s*CAS\s*:\s*\n?\s*([\d\-]+)",
     ])
+    # ชื่อสารเคมีของแถวเดียวกับ CAS ที่เลือกไว้ข้างบน (ช่อง "ชื่อทางการค้า" บนฟอร์ม ซึ่งเดิมว่างเปล่า
+    # เพราะไม่เคยมีฟิลด์ไหนดึงมาใส่ - ผู้ใช้อยากให้ชื่อกับ CAS ที่โชว์คู่กันเป็นสารตัวเดียวกันจริงๆ)
+    # ถ้าหาตารางส่วนผสมไม่เจอ (สารเดี่ยว ไม่มีตาราง) ปล่อยว่างไว้ ไม่ต้องเดา (trade_name ก็แสดงอยู่แล้ว)
+    d["ingredient_name"] = parse_ingredient_name_from_composition_table(t) or "-"
     d["un"] = grab(t, [
         r"UN[- ]Number.*?\n.*?IATA\s+([^\n]+?)" + _LINE_END,
         line(r"UN[\-\s]?Number"),
