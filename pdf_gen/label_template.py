@@ -2,19 +2,14 @@
 """
 label_template.py - สร้างฉลากสำหรับติดบนภาชนะบรรจุสารเคมี (secondary container label)
 
-ต่างจาก fill_template.py (ที่วางค่าทับ Template.pdf ของบริษัทที่มีอยู่แล้ว) ฉลากนี้วาดขึ้นใหม่ทั้งหมด
-ด้วย reportlab เพราะไม่มีเทมเพลตกระดาษตายตัว ขนาดหน้ากระดาษ = ขนาดฉลากที่เลือกจริงๆ (ไม่ใช่ A4)
-เพื่อให้พิมพ์ด้วยเครื่องพิมพ์สติกเกอร์ที่ตัดกระดาษตามขนาดได้พอดีทันที
+เดิมวาดข้อความไหลลงมาเรื่อยๆ (ไม่มีกรอบแบ่งหัวข้อ) แต่ผู้ใช้ส่งเทมเพลตอ้างอิงมา (PDF ที่มี 7 หัวข้อ
+เรียงเป็นกล่องสี่เหลี่ยม: ชื่อผลิตภัณฑ์ / ชื่อสารเคมีอันตราย / สัญลักษณ์ GHS / คำสัญญาณ / ข้อความแสดง
+อันตราย / ข้อความระวัง / ผู้ผลิต) เลยเปลี่ยนมาวาดเป็น "กล่องมีเส้นขอบ" ตามหัวข้อนั้นแทน สัดส่วนความสูง
+ของแต่ละกล่องวัดมาจากไฟล์ต้นแบบจริง (ดู BOX_WEIGHTS ด้านล่าง)
 
-โครงฉลากอ้างอิงตามหัวข้อที่กฎหมาย GHS กำหนด + จัดหน้าให้ใกล้เคียงฉลากเคมีทั่วไปที่ใช้งานจริง:
-  แถวบน:    ชื่อผลิตภัณฑ์ (ตัวใหญ่ กึ่งกลาง) + บรรทัดเล็ก CAS/UN No ใต้ชื่อ
-  แถวสอง:   สัญลักษณ์ GHS (ซ้าย) + คำสัญญาณตัวหนาสีแดง (ขวา) อยู่แถวเดียวกัน
-  ถัดไป:    Hazard statement / Precautionary statement - แต่ละข้อขึ้นบรรทัดใหม่
-            รหัส (เช่น H314:) แสดงตัวหนา ตามด้วยข้อความปกติในบรรทัดเดียวกัน ไม่มีหัวข้อ/บูลเล็ตคั่น
-  ท้ายฉลาก: ชื่อบริษัท (ตัวหนา) + ที่อยู่ + เบอร์ฉุกเฉิน
-
-ฟอนต์ไทย/ฟังก์ชันตัดบรรทัด/วางรูปสัญลักษณ์ GHS ใช้ตัวเดียวกับ fill_template.py (ผ่านการทดสอบแล้ว
-ว่าตัดบรรทัดภาษาไทย+อังกฤษได้ถูกต้อง ไม่จำเป็นต้องเขียนใหม่)
+ยังคงใช้ reportlab วาดขึ้นใหม่ทั้งหมด (ไม่ใช่ overlay ทับไฟล์ PDF ต้นแบบตรงๆ) เพราะต้องรองรับหลายขนาด/
+แนว (เล็ก/กลาง/ใหญ่/A4/A5/A6/กำหนดเอง, แนวตั้ง/แนวนอน) การวาดขึ้นใหม่ตามสัดส่วนทำให้ปรับขนาดได้
+อิสระกว่าการ overlay ทับไฟล์ที่ล็อกขนาดหน้าไว้ตายตัว
 """
 import io
 import os
@@ -28,67 +23,183 @@ from pdf_gen.fill_template import (
     wrap_thai, PICTOGRAM_ICON_DIR, PICTOGRAM_ORDER,
 )
 
-# ใช้ขนาด "กลาง" (100mm กว้าง) เป็นฐานอ้างอิงคำนวณสัดส่วนฟอนต์/ไอคอน ให้ขนาดอื่นย่อ/ขยายตามสัดส่วนจริง
-_BASE_WIDTH_MM = 100
-MARGIN_MM = 4
+# ใช้ขนาด "กลาง" แนวตั้ง (150mm สูง) เป็นฐานอ้างอิงคำนวณสัดส่วนฟอนต์/ไอคอน - อ้างอิงจาก "ความสูง"
+# ไม่ใช่ความกว้าง เพราะเลย์เอาต์นี้เรียงกล่อง 7 อันซ้อนกันในแนวตั้ง ตัวจำกัดพื้นที่จริงคือความสูงที่มี
+# ให้ 7 กล่องแบ่งกันเสมอ (ถ้าอิงความกว้างแทน ตอนเลือก "แนวนอน" ความกว้างจะเพิ่มขึ้นแต่ความสูงกลับ
+# ลดลง ฟอนต์จะยิ่งใหญ่เกินพื้นที่แนวตั้งที่เหลือน้อยลงจริง ทำให้ล้นกล่องทั้งหน้า)
+_BASE_HEIGHT_MM = 150
+MARGIN_MM = 5
 SIGNAL_COLOR = (0.75, 0.05, 0.05)  # สีแดงสำหรับคำสัญญาณ (Signal word) เหมือนฉลากเคมีทั่วไป
 
 # รหัส Hazard/Precautionary statement ที่ขึ้นต้นบรรทัด (เช่น "H314", "P305+P351+P338")
 # ใช้แยกส่วนรหัส (วาดตัวหนา) ออกจากข้อความบรรยาย (วาดตัวปกติ) ในบรรทัดเดียวกัน
 _CODE_PREFIX_RE = re.compile(r"^([HP]\d{3}(?:\s*[/+]\s*[HP]?\d{3})*)[:\s]*(.*)$")
 
+# 7 หัวข้อตามเทมเพลตอ้างอิงที่ผู้ใช้ส่งมา (เลขข้อ, ป้ายไทย, ป้ายอังกฤษ, น้ำหนักความสูงกล่อง)
+# น้ำหนักวัดสัดส่วนจริงจากไฟล์ต้นแบบ (กล่องชื่อผลิตภัณฑ์เตี้ยสุด กล่องผู้ผลิตสูงสุดเพราะมีที่อยู่ยาว)
+BOX_ITEMS = [
+    ("1", "ชื่อผลิตภัณฑ์", "Product Name", 1.00),
+    ("2", "ชื่อสารเคมีอันตราย", "Hazardous Substances", 1.35),
+    ("3", "รูปสัญลักษณ์", "GHS Pictograms", 1.35),
+    ("4", "คำสัญญาณ", "Signal Words", 1.35),
+    ("5", "ข้อความแสดงอันตราย", "Hazard Statements", 1.40),
+    ("6", "ข้อความระวัง", "Precautionary Statements", 1.40),
+    ("7", "ผู้ผลิต", "Manufacturing", 1.51),
+]
 
-def _scale_for(width_mm):
-    return width_mm / _BASE_WIDTH_MM
+
+def _scale_for(height_mm):
+    return height_mm / _BASE_HEIGHT_MM
 
 
-def _draw_statement(c, text, x, y_top, max_width, font_size, line_gap=1.5):
-    """
-    วาดข้อความ Hazard/Precautionary statement 1 ข้อ ขึ้นบรรทัดใหม่ ไม่มีบูลเล็ต/หัวข้อ
-    ถ้าขึ้นต้นด้วยรหัส (H226, P305+P351+P338 ฯลฯ) วาดส่วนรหัส+โคลอนเป็นตัวหนา
-    ตามด้วยข้อความบรรยายตัวปกติในบรรทัดเดียวกัน (บรรทัดต่อไปวาดตัวปกติทั้งหมด)
-    คืน y ตำแหน่งถัดจากบรรทัดสุดท้าย
-    """
+def _split_statement(text):
+    """แยกข้อความ Hazard/Precautionary 1 ข้อ ออกเป็น (รหัสตัวหนา+colon, ข้อความที่เหลือ) ถ้ามีรหัส
+    (H226, P305+P351+P338 ฯลฯ) นำหน้า คืน (None, text) ถ้าไม่มีรหัส (ข้อความบรรยายล้วนๆ)"""
     text = (text or "").strip()
     if not text or text == "-":
-        return y_top
-
+        return None, ""
     m = _CODE_PREFIX_RE.match(text)
-    prefix = ""
     if m and m.group(1):
         code = re.sub(r"\s+", "", m.group(1))
         rest = m.group(2).strip()
-        prefix = code + ": "
-        full = prefix + rest if rest else code + ":"
-    else:
-        full = text
+        return code + ": ", rest
+    return None, text
 
-    lines = wrap_thai(full, max_width, font_size=font_size)
-    line_height = font_size + line_gap
-    y = y_top
-    for i, ln in enumerate(lines):
-        code_part = prefix.strip()
-        if i == 0 and prefix and ln.startswith(code_part):
-            rest_part = ln[len(code_part):].strip()
-            c.setFont(FONT_BOLD, font_size)
-            c.drawString(x, y, code_part)
-            code_w = stringWidth(code_part + " ", FONT_BOLD, font_size)
-            c.setFont(FONT_REGULAR, font_size)
-            c.drawString(x + code_w, y, rest_part)
+
+def _fit_paragraph(text, box_w, box_h, base_size, min_size=5, line_gap=1.8):
+    """ลดฟอนต์จนข้อความ (ตัดบรรทัดแล้ว) พอดีกับกล่อง คืน (font_size, line_height, lines)
+    ถ้าเล็กสุดแล้วยังไม่พอ ตัดบรรทัดส่วนเกินออกแล้วใส่ '…' ท้ายบรรทัดสุดท้าย"""
+    # ความสูงที่ใช้จริง = ระยะขยับลงจากขอบบนของบรรทัดแรก (size) + (จำนวนบรรทัด-1) x line_h
+    # (บรรทัดแรกกินพื้นที่แค่ "size" ไม่ใช่ "line_h" เพราะยังไม่มีช่องว่างระหว่างบรรทัดมาก่อนหน้า)
+    size = base_size
+    lines, line_h = [], base_size + line_gap
+    while size >= min_size:
+        lines = wrap_thai(text, box_w, font_size=size)
+        line_h = size + line_gap
+        used_h = size + max(0, len(lines) - 1) * line_h
+        if used_h <= box_h:
+            return size, line_h, lines
+        size -= 0.5
+    max_lines = max(1, int((box_h - min_size) // line_h) + 1)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1].rstrip() + "…"
+    return min_size, line_h, lines
+
+
+def _fit_statement_list(statements, box_w, box_h, base_size, min_size=5, line_gap=1.8):
+    """หาขนาดฟอนต์ที่ใหญ่สุดที่ทำให้รายการข้อความทั้งหมด (รวมกัน) พอดีความสูงกล่อง"""
+    size = base_size
+    while size >= min_size:
+        total = 0
+        for stmt in statements:
+            _, rest = _split_statement(stmt)
+            code, _ = _split_statement(stmt)
+            full = (code + rest) if code else rest
+            if full:
+                total += len(wrap_thai(full, box_w, font_size=size))
+        line_h = size + line_gap
+        used_h = size + max(0, total - 1) * line_h
+        if used_h <= box_h:
+            return size
+        size -= 0.5
+    return min_size
+
+
+def _draw_statements_in_box(c, statements, x, y_top, box_w, box_h, page_h, base_size):
+    """วาดรายการ Hazard/Precautionary statement ในกล่อง (รหัสตัวหนา+colon นำหน้าข้อความปกติ)
+    หยุดวาดถ้าเกินความสูงกล่อง (กันข้อความล้นทับกล่องถัดไป) คืนตำแหน่ง y ของบรรทัดสุดท้ายที่วาดจริง
+    (ไม่ใช่ตำแหน่งบรรทัดถัดไปที่ยังไม่ได้วาด กันนับพื้นที่เกินจริงตอนคำนวณกล่องถัดไป)"""
+    statements = [s for s in (statements or []) if (s or "").strip() and s.strip() != "-"]
+    if not statements or box_h < 5:
+        # ไม่มีที่เหลือพอจะวาดสักบรรทัดเลย (box_h ติดลบ/เกือบศูนย์) ข้ามไปเงียบๆ ดีกว่าฝืนวาด
+        # แล้วล้นออกนอกกล่อง (พบตอนฉลากขนาดเล็กมากที่ชื่อสารกินพื้นที่จนไม่เหลือให้ CAS/UN)
+        return y_top
+    size = _fit_statement_list(statements, box_w, box_h, base_size)
+    line_h = size + 1.8
+    y = y_top + size  # ตำแหน่งบรรทัดถัดไปที่ "จะ" วาด (ยังไม่ได้วาดจริง)
+    last_drawn_y = y
+    bottom = y_top + box_h
+    for stmt in statements:
+        code, rest = _split_statement(stmt)
+        full = (code + rest) if code else rest
+        lines = wrap_thai(full, box_w, font_size=size)
+        for i, ln in enumerate(lines):
+            if y > bottom:
+                return last_drawn_y
+            if i == 0 and code and ln.startswith(code.strip()):
+                code_txt = code.strip()
+                rest_txt = ln[len(code_txt):].strip()
+                c.setFont(FONT_BOLD, size)
+                c.drawString(x, page_h - y, code_txt)
+                code_w = stringWidth(code_txt + " ", FONT_BOLD, size)
+                c.setFont(FONT_REGULAR, size)
+                c.drawString(x + code_w, page_h - y, rest_txt)
+            else:
+                c.setFont(FONT_REGULAR, size)
+                c.drawString(x, page_h - y, ln)
+            last_drawn_y = y
+            y += line_h
+    return last_drawn_y
+
+
+def _draw_paragraph_in_box(c, text, x, y_top, box_w, box_h, page_h, base_size,
+                            center=False, bold=False, color=None, upper=False):
+    """วาดข้อความยาว 1 ก้อน (ตัดบรรทัดอัตโนมัติ) ให้พอดีกล่อง คืนตำแหน่ง y ของบรรทัดสุดท้ายที่วาดจริง
+    บวกช่องว่างเล็กน้อย (ไม่ใช่ y_top+size+n*line_h ที่จะเกินพื้นที่จริงไปหนึ่ง line_h เสมอ)"""
+    text = (text or "").strip()
+    if not text or text == "-" or box_h < 5:
+        # box_h < 5: ไม่มีที่เหลือพอจะวาดสักบรรทัดเลย ข้ามไปเงียบๆ ดีกว่าฝืนวาดแล้วล้นออกนอกกล่อง
+        return y_top
+    if upper:
+        text = text.upper()
+    size, line_h, lines = _fit_paragraph(text, box_w, box_h, base_size)
+    c.setFont(FONT_BOLD if bold else FONT_REGULAR, size)
+    if color:
+        c.setFillColorRGB(*color)
+    y = y_top + size
+    cx = x + box_w / 2
+    for ln in lines:
+        if center:
+            c.drawCentredString(cx, page_h - y, ln)
         else:
-            c.setFont(FONT_REGULAR, font_size)
-            c.drawString(x, y, ln)
-        y -= line_height
+            c.drawString(x, page_h - y, ln)
+        last_drawn_y = y
+        y += line_h
+    y = last_drawn_y + line_h * 0.35  # ช่องว่างเล็กน้อยก่อนเนื้อหาถัดไป (ถ้ามี) ไม่ใช่เต็ม line_h
+    if color:
+        c.setFillColorRGB(0, 0, 0)
     return y
+
+
+def _draw_pictograms_in_box(c, pictogram_keys, x, y_top, box_w, box_h, page_h):
+    """วาดไอคอน GHS เรียงแถวเดียว กึ่งกลางทั้งแนวนอน/แนวตั้งของกล่อง"""
+    keys = [k for k in PICTOGRAM_ORDER if k in (pictogram_keys or [])]
+    if not keys:
+        return
+    n = len(keys)
+    gap = box_w * 0.02
+    max_icon_w = (box_w - (n - 1) * gap) / n
+    icon_size = min(box_h * 0.9, max_icon_w)
+    row_w = n * icon_size + (n - 1) * gap
+    start_x = x + (box_w - row_w) / 2
+    icon_top = y_top + (box_h - icon_size) / 2
+    for i, key in enumerate(keys):
+        icon_path = os.path.join(PICTOGRAM_ICON_DIR, f"{key}.png")
+        if os.path.exists(icon_path):
+            icon_x = start_x + i * (icon_size + gap)
+            c.drawImage(icon_path, icon_x, page_h - icon_top - icon_size, width=icon_size, height=icon_size,
+                        preserveAspectRatio=True, mask="auto")
 
 
 def build_label_pdf(data, size_key, size_presets, out_path, orientation="portrait"):
     """
-    สร้างฉลากภาชนะบรรจุ 1 หน้า ขนาดตาม size_key (ต้องตรงกับ key ใน size_presets)
+    สร้างฉลากภาชนะบรรจุ 1 หน้า ขนาดตาม size_key (ต้องตรงกับ key ใน size_presets) เป็นกล่อง 7 หัวข้อ
+    ตามเทมเพลตอ้างอิงที่ผู้ใช้ส่งมา (ดู BOX_ITEMS)
     size_presets: list ของ (key, label, width_mm, height_mm) เหมือนใน fields.LABEL_SIZE_PRESETS
-    data: dict ข้อมูลฉลาก (product_name, cas, un, signal_word, pictograms, hazard_statements,
-          precautionary_statements, supplier_name, supplier_address, emergency_phone, supplemental_info,
-          custom_width_mm/custom_height_mm ถ้า size_key="custom")
+    data: dict ข้อมูลฉลาก (product_name, cas, un, signal_word, pictograms, hazardous_substances,
+          hazard_statements, precautionary_statements, supplier_name, supplier_address,
+          emergency_phone, custom_width_mm/custom_height_mm ถ้า size_key="custom")
     orientation: "portrait" (แนวตั้ง, ค่าเริ่มต้น) หรือ "landscape" (แนวนอน - สลับกว้าง/สูง)
     """
     register_thai_fonts()
@@ -110,155 +221,95 @@ def build_label_pdf(data, size_key, size_presets, out_path, orientation="portrai
         height_mm = max(20, height_mm)
     if orientation == "landscape":
         width_mm, height_mm = height_mm, width_mm
-    scale = _scale_for(width_mm)
+    scale = _scale_for(height_mm)
 
     width_pt, height_pt = width_mm * mm, height_mm * mm
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(width_pt, height_pt))
 
     margin = MARGIN_MM * mm
-    content_w = width_pt - 2 * margin
-    x_left = margin
-    y = height_pt - margin
+    box_x = margin
+    box_w = width_pt - 2 * margin
+    inner_pad = 3 * scale
 
-    # กรอบขอบฉลาก (เส้นบาง ช่วยให้เห็นขอบตัดชัดตอนพิมพ์)
+    # เส้นขอบรอบนอกทั้งหน้า (เหมือนเทมเพลตอ้างอิง)
     c.setLineWidth(0.75)
     c.rect(margin * 0.4, margin * 0.4, width_pt - margin * 0.8, height_pt - margin * 0.8, stroke=1, fill=0)
 
-    # ชื่อผลิตภัณฑ์ - ตัวใหญ่สุดบนฉลาก กึ่งกลาง (ตัวพิมพ์ใหญ่ทั้งหมดเหมือนฉลากเคมีทั่วไป
-    # ไม่กระทบภาษาไทยเพราะ .upper() ไม่มีผลกับอักษรไทย)
-    product_name = (data.get("product_name") or "-").strip()
-    if product_name and product_name != "-":
-        base_size = max(9, 15 * scale)
-        lines = wrap_thai(product_name.upper(), content_w, font_size=base_size)
-        c.setFont(FONT_BOLD, base_size)
-        line_height = base_size + 2
-        for ln in lines:
-            y -= line_height
-            c.drawCentredString(width_pt / 2, y, ln)
+    label_size = max(6.5, 8.5 * scale)
+    label_line_h = label_size + 6 * scale
+    gap_after_box = 6 * scale
 
-    # บรรทัดเล็ก CAS No / UN No รวมกัน ใต้ชื่อผลิตภัณฑ์
-    cas = (data.get("cas") or "").strip()
-    un = (data.get("un") or "").strip()
-    id_parts = []
-    if cas and cas != "-":
-        id_parts.append(f"CAS {cas}")
-    if un and un != "-":
-        id_parts.append(f"UN {un}")
-    if id_parts:
-        id_size = max(6, 7.5 * scale)
-        c.setFont(FONT_REGULAR, id_size)
-        c.drawCentredString(width_pt / 2, y - id_size - 2, "  |  ".join(id_parts))
-        y -= id_size + 8
-    else:
-        y -= 4
+    total_weight = sum(w for *_, w in BOX_ITEMS)
+    fixed_overhead = len(BOX_ITEMS) * (label_line_h + gap_after_box)
+    available_h = height_pt - 2 * margin
+    box_total_h = max(available_h - fixed_overhead, available_h * 0.3)
 
-    # "Contains: ..." - รายชื่อสารเคมีอันตราย (จากตารางส่วนผสม Section 3 ถ้ามี) หนึ่งใน 6 องค์ประกอบ
-    # ที่ GHS กำหนดให้ต้องมีบนฉลาก แยกจากชื่อผลิตภัณฑ์เพราะผลิตภัณฑ์อาจเป็นของผสมหลายสาร
-    hazardous_substances = [s.strip() for s in (data.get("hazardous_substances") or []) if s and s.strip()]
-    if hazardous_substances:
-        contains_size = max(6, 7.5 * scale)
-        contains_text = "Contains: " + ", ".join(hazardous_substances)
-        lines = wrap_thai(contains_text, content_w, font_size=contains_size)
-        c.setFont(FONT_REGULAR, contains_size)
-        line_height = contains_size + 1.5
-        for ln in lines:
-            y -= line_height
-            c.drawCentredString(width_pt / 2, y, ln)
-        y -= 4
+    body_size = max(6, 8 * scale)
+    y = margin  # ระยะจากขอบบนของหน้า (เพิ่มขึ้นเรื่อยๆ ตอนวาดลงมา)
 
-    y -= 4 * scale
+    for num, label_th, label_en, weight in BOX_ITEMS:
+        # ป้ายหัวข้อ "N.ป้ายไทย (English)" เหนือกล่อง
+        c.setFont(FONT_BOLD, label_size)
+        c.drawString(box_x, height_pt - y - label_size, f"{num}.{label_th} ({label_en})")
+        y += label_line_h
 
-    # แถวเดียวกัน: สัญลักษณ์ GHS (ซ้าย) + คำสัญญาณตัวหนาสีแดง (ขวา)
-    selected = [k for k in PICTOGRAM_ORDER if k in (data.get("pictograms") or [])]
-    signal_word = (data.get("signal_word") or "").strip()
-    has_signal = signal_word and signal_word != "-"
+        this_box_h = box_total_h * (weight / total_weight)
+        c.setLineWidth(0.75)
+        c.rect(box_x, height_pt - y - this_box_h, box_w, this_box_h, stroke=1, fill=0)
 
-    icon_size = max(26, 38 * scale)
-    row_top_y = y
+        inner_x = box_x + inner_pad
+        inner_y = y + inner_pad
+        inner_w = box_w - 2 * inner_pad
+        inner_h = this_box_h - 2 * inner_pad
 
-    if selected:
-        gap = 4 * scale
-        n = len(selected)
-        icons_w = n * icon_size + (n - 1) * gap
-        sig_size = max(11, 15 * scale) if has_signal else 0
-        sig_w = stringWidth(signal_word.upper(), FONT_BOLD, sig_size) if has_signal else 0
-        total_w = icons_w + (16 if has_signal else 0) + sig_w
-        start_x = max(x_left, (width_pt - total_w) / 2)
+        if num == "1":
+            # ชื่อผลิตภัณฑ์ (ตัวใหญ่ ตัวหนา กึ่งกลาง) + บรรทัดเล็ก CAS/UN ใต้ชื่อ
+            # จองพื้นที่ CAS/UN ไว้ก่อนเป็นสัดส่วนคงที่ (ไม่ใช่แบ่ง 68/32 แล้วปล่อยให้ชื่อผลิตภัณฑ์ใช้
+            # เกินจำเป็น เพราะชื่อสั้นๆ พอดีกับฟอนต์ใหญ่สุดในบรรทัดเดียวอยู่แล้ว ไม่ยอมลดขนาดลงเอง
+            # ทำให้ก่อนหน้านี้ไม่เหลือที่ให้ CAS/UN เลยจนถูกข้ามไปเงียบๆ)
+            cas = (data.get("cas") or "").strip()
+            un = (data.get("un") or "").strip()
+            id_parts = ([f"CAS {cas}"] if cas and cas != "-" else []) + ([f"UN {un}"] if un and un != "-" else [])
+            id_size = max(6, 7 * scale)
+            cas_reserved_h = (id_size + 3) if id_parts else 0
+            name_h = max(inner_h * 0.5, inner_h - cas_reserved_h)
+            ny = _draw_paragraph_in_box(c, data.get("product_name"), inner_x, inner_y, inner_w, name_h,
+                                        height_pt, max(9, 13 * scale), center=True, bold=True, upper=True)
+            if id_parts:
+                _draw_paragraph_in_box(c, "  |  ".join(id_parts), inner_x, ny, inner_w,
+                                       inner_h - (ny - inner_y), height_pt, id_size, center=True)
+        elif num == "2":
+            substances = [s.strip() for s in (data.get("hazardous_substances") or []) if s and s.strip()]
+            _draw_paragraph_in_box(c, ", ".join(substances), inner_x, inner_y, inner_w, inner_h,
+                                   height_pt, body_size)
+        elif num == "3":
+            _draw_pictograms_in_box(c, data.get("pictograms"), inner_x, inner_y, inner_w, inner_h, height_pt)
+        elif num == "4":
+            _draw_paragraph_in_box(c, data.get("signal_word"), inner_x, inner_y, inner_w, inner_h, height_pt,
+                                   max(9, 13 * scale), center=True, bold=True, color=SIGNAL_COLOR, upper=True)
+        elif num == "5":
+            _draw_statements_in_box(c, data.get("hazard_statements"), inner_x, inner_y, inner_w, inner_h,
+                                    height_pt, body_size)
+        elif num == "6":
+            _draw_statements_in_box(c, data.get("precautionary_statements"), inner_x, inner_y, inner_w, inner_h,
+                                    height_pt, body_size)
+        elif num == "7":
+            supplier_name = (data.get("supplier_name") or "").strip()
+            supplier_address = (data.get("supplier_address") or "").strip()
+            emergency_phone = (data.get("emergency_phone") or "").strip()
+            ny = inner_y
+            if supplier_name and supplier_name != "-":
+                ny = _draw_paragraph_in_box(c, supplier_name, inner_x, ny, inner_w, inner_h - (ny - inner_y),
+                                            height_pt, max(7, 9 * scale), bold=True)
+            if supplier_address and supplier_address != "-":
+                ny = _draw_paragraph_in_box(c, supplier_address, inner_x, ny, inner_w, inner_h - (ny - inner_y),
+                                            height_pt, body_size)
+            if emergency_phone and emergency_phone != "-":
+                _draw_paragraph_in_box(c, f"Emergency: {emergency_phone}", inner_x, ny, inner_w,
+                                       inner_h - (ny - inner_y), height_pt, body_size)
 
-        for i, key in enumerate(selected):
-            icon_path = os.path.join(PICTOGRAM_ICON_DIR, f"{key}.png")
-            icon_x = start_x + i * (icon_size + gap)
-            if os.path.exists(icon_path):
-                c.drawImage(icon_path, icon_x, row_top_y - icon_size, width=icon_size, height=icon_size,
-                            preserveAspectRatio=True, mask="auto")
-        if has_signal:
-            c.setFont(FONT_BOLD, sig_size)
-            c.setFillColorRGB(*SIGNAL_COLOR)
-            sig_x = start_x + icons_w + 16
-            sig_y = row_top_y - icon_size / 2 - sig_size * 0.35
-            c.drawString(sig_x, sig_y, signal_word.upper())
-            c.setFillColorRGB(0, 0, 0)
-        y -= icon_size + 10 * scale
-    elif has_signal:
-        sig_size = max(11, 15 * scale)
-        c.setFont(FONT_BOLD, sig_size)
-        c.setFillColorRGB(*SIGNAL_COLOR)
-        y -= sig_size
-        c.drawCentredString(width_pt / 2, y, signal_word.upper())
-        c.setFillColorRGB(0, 0, 0)
-        y -= 10 * scale
-
-    body_size = max(6.5, 8 * scale)
-
-    # Hazard statements - แต่ละข้อขึ้นบรรทัดใหม่ ไม่มีหัวข้อ/บูลเล็ต (รหัสตัวหนา + ข้อความปกติ)
-    for stmt in (data.get("hazard_statements") or []):
-        y = _draw_statement(c, stmt, x_left, y, content_w, body_size)
-    if data.get("hazard_statements"):
-        y -= 3
-
-    # Precautionary statements
-    for stmt in (data.get("precautionary_statements") or []):
-        y = _draw_statement(c, stmt, x_left, y, content_w, body_size)
-    if data.get("precautionary_statements"):
-        y -= 3
-
-    # Supplemental information (ถ้ามี) - ผู้ใช้พิมพ์เองได้ ไม่ได้ดึงอัตโนมัติจาก SDS
-    supplemental = (data.get("supplemental_info") or "").strip()
-    if supplemental and supplemental != "-":
-        lines = wrap_thai(supplemental, content_w, font_size=body_size)
-        c.setFont(FONT_REGULAR, body_size)
-        line_height = body_size + 1.5
-        for ln in lines:
-            c.drawString(x_left, y, ln)
-            y -= line_height
-
-    # ท้ายฉลาก - ข้อมูลผู้ผลิต/ผู้จำหน่าย (ชื่อบริษัทตัวหนา ตามด้วยที่อยู่/เบอร์ฉุกเฉินตัวปกติ)
-    footer_size = max(5.5, 7 * scale)
-    supplier_name = (data.get("supplier_name") or "").strip()
-    supplier_address = (data.get("supplier_address") or "").strip()
-    emergency_phone = (data.get("emergency_phone") or "").strip()
-
-    footer_entries = []  # (text, bold?)
-    if supplier_name and supplier_name != "-":
-        footer_entries.append((supplier_name.upper(), True))
-    if supplier_address and supplier_address != "-":
-        footer_entries.append((supplier_address, False))
-    if emergency_phone and emergency_phone != "-":
-        footer_entries.append((f"Emergency: {emergency_phone}", False))
-
-    if footer_entries:
-        # คำนวณจำนวนบรรทัดทั้งหมดก่อน (รวม wrap) แล้ววางจากล่างขึ้นบน กันชนกรอบล่าง
-        wrapped_all = []
-        for text, bold in footer_entries:
-            font = FONT_BOLD if bold else FONT_REGULAR
-            for wl in wrap_thai(text, content_w, font_size=footer_size):
-                wrapped_all.append((wl, font))
-        footer_y = margin * 0.4 + 6
-        line_h = footer_size + 1.5
-        for i, (wl, font) in enumerate(reversed(wrapped_all)):
-            c.setFont(font, footer_size)
-            c.drawCentredString(width_pt / 2, footer_y + i * line_h, wl)
+        y += this_box_h + gap_after_box
 
     c.showPage()
     c.save()
@@ -283,6 +334,7 @@ if __name__ == "__main__":
         "un": "1824",
         "signal_word": "Danger",
         "pictograms": ["corrosive", "toxic"],
+        "hazardous_substances": ["Sodium hydroxide", "Water"],
         "hazard_statements": [
             "H314 Causes severe skin burns and eye damage.",
             "H318 Causes serious eye damage.",
@@ -293,9 +345,8 @@ if __name__ == "__main__":
             "Seek emergency medical aid immediately.",
         ],
         "supplier_name": "Apex Chemical Corp.",
-        "supplier_address": "",
+        "supplier_address": "123 Industrial Estate, Chonburi 20000",
         "emergency_phone": "1-800-555-CHEM",
-        "supplemental_info": "",
     }
     fill_label(sample, "medium", LABEL_SIZE_PRESETS, "data/generated/test_label.pdf")
     print("saved test_label.pdf")

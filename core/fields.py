@@ -99,7 +99,7 @@ ALL_KEYS = ([key for _, fields in FIELD_GROUPS for key, _, _ in fields]
 # แปลแล้วจะเพี้ยน (ดูปัญหาเดิมที่ trade_name เคยถูกแปลงเป็นคำทับศัพท์ผิดๆ ใน fields.py ด้านบน)
 LABEL_TRANSLATABLE_KEYS = [
     "signal_word", "hazardous_substances", "hazard_statements",
-    "precautionary_statements", "supplemental_info",
+    "precautionary_statements",
 ]
 
 # ขนาดฉลากภาชนะบรรจุที่เลือกได้ (key, ป้ายไทย, กว้าง มม., สูง มม.) - preset มาตรฐานตาม

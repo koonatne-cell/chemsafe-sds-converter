@@ -60,7 +60,6 @@ function collectLabelData() {
         supplier_name: document.getElementById("f_supplier_name").value,
         supplier_address: document.getElementById("f_supplier_address").value,
         emergency_phone: document.getElementById("f_emergency_phone").value,
-        supplemental_info: document.getElementById("f_supplemental_info").value,
         size_key: labelSize.value,
         orientation: document.querySelector("input[name=orientation]:checked").value,
         custom_width_mm: document.getElementById("customWidth").value,
