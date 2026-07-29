@@ -528,13 +528,27 @@ def _fallback_statements(raw_block):
     return results
 
 
+# จัดลำดับ Hazard Statement ให้ "อันตรายต่อคน" ขึ้นก่อนเสมอ (ผู้ใช้ระบุว่าฉลากต้องเน้นอันตราย
+# ต่อคนที่หยิบจับ/ใช้งานสารเคมีเป็นอย่างแรก ไม่ใช่เรียงตามลำดับที่เจอในเอกสารเฉยๆ) อิงจากเลขหมวดของ
+# GHS H-code: H3xx = อันตรายต่อสุขภาพ (พิษ ระคายเคือง กัดกร่อน ฯลฯ - กระทบคนโดยตรงที่สุด) มาก่อน
+# H2xx = อันตรายทางกายภาพ (ไวไฟ ระเบิด ฯลฯ - อันตรายต่อคนเหมือนกันแต่ทางอ้อมกว่า) มาเป็นอันดับสอง
+# H4xx = อันตรายต่อสิ่งแวดล้อม (เช่น พิษต่อสิ่งมีชีวิตในน้ำ - ไม่ใช่อันตรายต่อคนโดยตรง) มาท้ายสุด
+# ใช้ stable sort เก็บลำดับเดิมไว้ภายในกลุ่มเดียวกัน (ไม่สลับลำดับ H3xx ด้วยกันเองโดยไม่จำเป็น)
+def _hazard_rank(entry):
+    m = re.match(r"H([234])\d{2}", entry)
+    if not m:
+        return 1  # ไม่รู้หมวด (เช่น fallback ไม่มีรหัส) ให้อยู่กลางๆ ไม่เอนเอียงไปทางใด
+    return {"3": 0, "2": 1, "4": 2}[m.group(1)]
+
+
 def extract_hazard_statements(text):
     """ดึงรายการ Hazard Statement พร้อมข้อความ เช่น ['H226 Flammable liquid and vapour.']
-    ถ้าไม่มีรหัส H-code กำกับเลย (SDS บางฉบับเขียนบรรยายเฉยๆ) fallback ไปแยกประโยคจากป้าย
-    "Hazard Statements" ตรงๆ แทน"""
+    เรียงลำดับใหม่ให้อันตรายต่อคน (H3xx สุขภาพ, H2xx กายภาพ) ขึ้นก่อนอันตรายต่อสิ่งแวดล้อม (H4xx)
+    เสมอ (ดู _hazard_rank) ถ้าไม่มีรหัส H-code กำกับเลย (SDS บางฉบับเขียนบรรยายเฉยๆ) fallback ไปแยก
+    ประโยคจากป้าย "Hazard Statements" ตรงๆ แทน (กรณีนี้ไม่มีรหัสให้จัดลำดับ คงลำดับเดิมในเอกสาร)"""
     coded = _extract_code_lines(text, _H_CODE_LINE)
     if coded:
-        return coded
+        return sorted(coded, key=_hazard_rank)
     section2 = extract_section(text, 2) or text
     raw = _raw_statement_block(section2, r"Hazard [Ss]tatements?")
     return _fallback_statements(raw) if raw else []
