@@ -216,6 +216,17 @@ def block(label):
     return label + r"\s*:\s*(.+?)" + _BLOCK_END
 
 
+def _extract_leading_number(raw):
+    """ตัดข้อความบรรยายที่ห่อหุ้มตัวเลขออก เหลือแค่ตัวเลข/ช่วงตัวเลข เช่น
+    "โดยประมาณ 9.0," -> "9.0", "6.0 - 8.0 (25 °C (77 °F))" -> "6.0 - 8.0"
+    ใช้กับ pH ที่ผู้ใช้อยากได้แค่เลข ไม่เอาคำอธิบายก่อน/หลัง (เช่น "โดยประมาณ", อุณหภูมิที่วัด)
+    คืนค่าเดิมถ้าไม่มีตัวเลขให้ตัด (เช่น "-" หรือไม่เจอเลย)"""
+    if not raw or raw == "-":
+        return raw
+    m = re.search(r"[\d.]+\s*(?:[-–~]\s*[\d.]+)?", raw)
+    return m.group(0).strip() if m else raw
+
+
 def extract_section(text, section_num, next_section_num=None):
     """
     ตัดข้อความมาเฉพาะช่วง "SECTION N" (หรือ "ส่วนที่ N" สำหรับ SDS ภาษาไทย) จนถึงก่อนหัวข้อถัดไป
@@ -633,6 +644,7 @@ def parse_sds(pdf_path):
     # กันป้ายย่อยชื่อเดียวกัน (Eyes/Skin/Ingestion/Inhalation) ในคนละ section ปนกัน
     section4 = extract_section(t, 4)
     section11 = extract_section(t, 11)
+    section13 = extract_section(t, 13)
 
     # หมายเหตุ: field สั้น (บรรทัดเดียว เช่น pH, สี, กลิ่น) ใช้ line() - หยุดจับที่ช่องว่างยาว (คอลัมน์ถัดไป)
     # field ยาว (อาจ wrap หลายบรรทัด เช่น วิธีกำจัด, การปฐมพยาบาล) ใช้ block() - จับข้ามบรรทัดได้จนกว่าจะเจอ
@@ -697,11 +709,11 @@ def parse_sds(pdf_path):
         line(r"Boiling [Pp]oint,?\s*(?:initial boiling point\s*)?(?:and\s*)?(?:boiling\s*)?(?:range)?"),
         line(r"จุดเดือด"),
     ])
-    d["ph"] = grab(t, [
+    d["ph"] = _extract_leading_number(grab(t, [
         line(r"pH[\-\s]?value"),
         line(r"pH"),
         line(r"ความเป็นกรด[\-\s]?ด่าง"),
-    ])
+    ]))
     d["flash"] = grab(t, [line(r"Flash [Pp]oint"), line(r"จุดวาบไฟ")])
     # Section 4 (การปฐมพยาบาล) - ค้นในช่วง Section 4 ก่อน กันไปจับ Section 11 (พิษวิทยา) ผิด
     # ป้ายเปล่าๆ อย่าง "Eyes:"/"Skin:"/"Ingestion:"/"Inhalation:" ต้องยึดให้อยู่ต้นบรรทัดเท่านั้น
@@ -740,29 +752,39 @@ def parse_sds(pdf_path):
     ])
     # Section 11 (พิษวิทยา) - ค้นในช่วง Section 11 ก่อน กันไปจับ Section 4 (ปฐมพยาบาล) ผิด
     # SDS ตระกูล Sika/CPAC/LANKO ใช้สำนวน "เมื่อ..." (เมื่อเข้าตา/เมื่อสัมผัสกับผิวหนัง ฯลฯ) แทน
+    # หมายเหตุ: label ไทยหลายคำที่นี่ใช้ "\s*" คั่นระหว่างพยางค์/คำ (แทนการเขียนติดกันเป๊ะ) เพราะ
+    # SDS ตระกูล Sika/CPAC/LANKO มักตัดขึ้นบรรทัดใหม่กลางคำ (เช่น "เมื่อกลืน\nกิน", "เมื่อ\nหายใจเข้าไป")
+    # ทำให้ label ที่เขียนติดกันแบบเดิมไม่ match เพราะมี "\n" ขั้นกลาง ("\s" ครอบคลุม "\n" ด้วยอยู่แล้ว)
+    # ลำดับ pattern: ค่า LD50/LC50 (ตัวเลขพิษวิทยาจริง) มาก่อนเสมอ เพราะมีประโยชน์กว่าข้อความ
+    # "ไม่มีการจำแนกโดยขึ้นกับข้อมูลที่มีอยู่" (= not classified) ที่มักอยู่ในหัวข้อ "การทำลาย.../
+    # การกัดกร่อน..." ซึ่งใช้เป็น fallback ต่อท้ายแทน
     d["hz_eye"] = grab_scoped(t, section11, [
         block(r"on the eye"),
         block(r"Eye [Ii]rritation"),
         block(r"(?:^|\n)\s*Eyes"),
         block(r"(?:^|\n)\s*ทางตา"),
-        block(r"เมื่อเข้าตา"), block(r"เมื่อสัมผัสกับตา"),
+        block(r"เมื่อ\s*เข้า\s*ตา"), block(r"เมื่อ\s*สัมผัส\s*กับ\s*ตา"),
     ])
     d["hz_skin"] = grab_scoped(t, section11, [
         block(r"on the skin"),
         block(r"Skin [Ii]rritation"),
         block(r"(?:^|\n)\s*Skin"),
         block(r"(?:^|\n)\s*ทางผิวหนัง"),
-        block(r"เมื่อสัมผัสกับผิวหนัง"),
+        block(r"เมื่อ\s*สัมผัส\s*กับ\s*ผิวหนัง"),
+        block(r"ความเป็นพิษ.{0,15}เมื่อ\s*สัมผัส\s*ผิวหนัง"),
+        block(r"การกัดกร่อน\s*และการระคายเคืองต่อผิวหนัง"),
     ])
     d["hz_oral"] = grab_scoped(t, section11, [
         block(r"(?:^|\n)\s*Ingestion"),
         block(r"(?:^|\n)\s*ทางปาก"),
-        block(r"เมื่อกลืนกินเข้าไป"), block(r"เมื่อกลืนกิน"),
+        block(r"เมื่อ\s*กลืน\s*กิน\s*เข้าไป"), block(r"เมื่อ\s*กลืน\s*กิน"),
+        block(r"ความเป็นพิษ.{0,15}เมื่อ\s*กลืน\s*กิน"),
     ])
     d["hz_inhale"] = grab_scoped(t, section11, [
         block(r"(?:^|\n)\s*Inhalation"),
         block(r"(?:^|\n)\s*ทางการหายใจ"), block(r"การสูดดม"),
-        block(r"เมื่อหายใจเข้าไป"),
+        block(r"เมื่อ\s*หายใจ\s*เข้าไป"),
+        block(r"ความเป็นพิษ.{0,15}เมื่อ\s*หายใจ\s*เข้าไป"),
     ])
     d["fire"] = grab(t, [
         block(r"Suitable extinguishing agents"),
@@ -788,10 +810,18 @@ def parse_sds(pdf_path):
         # ("วิธีการและวัสดุสำหรับกักเก็บ\nและทำความสะอาด") จึงต้องใช้ \s* คั่นแทนการเว้นวรรคปกติ
         block(r"วิธีการและวัสดุ\s*สำหรับกักเก็บ\s*และทำความสะอาด"),
     ])
-    d["disposal"] = grab(t, [
+    # เดิม grab(t, ...) ค้นทั้งไฟล์แบบไม่ scope section ทำให้บางไฟล์ไปเจอ "การกำจัด:" สั้นๆ ใน
+    # Section 2 (บรรทัดย่อยของ P501 ใต้ข้อควรระวัง) แทนที่จะเป็น Section 13 (ข้อพิจารณาในการกำจัด)
+    # ตัวจริงตามชื่อ field - ถ้าไฟล์ไหนไม่มี P-code เลย (เช่น "ไม่ใช่สารอันตราย") เดิมจะออกมาเป็น "-"
+    # ทั้งที่ Section 13 มีข้อมูลจริงอยู่ - ใช้ grab_scoped ตรง section13 ก่อนเป็นหลัก แล้วค่อย fallback
+    # ไปค้นทั้งไฟล์ถ้าหา section 13 ไม่เจอเลย (SDS บางฉบับไม่มีเลขหัวข้อกำกับ)
+    d["disposal"] = grab_scoped(t, section13, [
         block(r"Recommendation"),
         block(r"Disposal methods"),
         block(r"Waste treatment methods"),
+        # "วิธีการกำจัด" ตามด้วยหัวข้อย่อย "บรรจุภัณฑ์ที่ปนเปื้อน" คนละบรรทัดก่อนโคลอน (พบใน Sika/LANKO)
+        block(r"วิธีการกำจัด\s*บรรจุภัณฑ์ที่ปนเปื้อน"),
+        block(r"บรรจุภัณฑ์ที่ปนเปื้อน"),
         block(r"(?:วิธี|คำแนะนำ)?การกำจัด"),
     ])
     d["storage"] = grab(t, [
