@@ -95,15 +95,20 @@ _SHORT_NEXT_LABEL_X = {
 #   - "ทางตา/ทางปาก/ทางผิวหนัง/ทางการหายใจ" ทั้งฝั่งปฐมพยาบาลและอันตรายต่อสุขภาพ แท้จริงแล้วแชร์กรอบเดียวกัน
 #     4 แถวย่อยไม่มีเส้นแบ่งจริงในเทมเพลต (กรอบสุขภาพ 310.7-385.7, กรอบปฐมพยาบาล 385.7-460.7 กรอบละ 75pt)
 # ปรับพิกัดทั้งหมดให้ตรงกับกรอบจริง (ชิดขอบบนซ้ายของแต่ละกรอบ + เผื่อระยะขอบเล็กน้อย ~3-4pt)
+# ตำแหน่งด้านล่างนี้วัดใหม่จริงด้วย fitz page.search_for() ต่อป้ายแต่ละอัน (y0 ของตัวอักษรป้ายเอง)
+# ของเดิมกะประมาณจากขอบกรอบ (box top) ไม่ใช่ตำแหน่งจริงที่ป้ายพิมพ์อยู่ ทำให้ค่าที่วางเยื้องขึ้นไป
+# 3-14pt แล้วแต่แถว (ผิดมากสุดที่แถวบนของกรอบ ผิดน้อยสุดที่แถวล่าง) ผู้ใช้เห็นปัญหานี้ตรงที่ข้อความ
+# "ทางตา/ทางปาก/ทางผิวหนัง/ทางการหายใจ" (ปฐมพยาบาล+พิษวิทยา แชร์กรอบเดียวกัน 8 แถวย่อย) ไม่ตรงแถว
+# กับป้ายของมันเอง (เลื่อนขึ้นไปทับแถวก่อนหน้า) แก้โดยใช้ y0 จริงของป้ายเป็น top ตรงๆ ทุกแถว
 BLOCK = {
-    "usage":     (100, 240),  "reactivity": (100, 254),
-    "fire":      (100, 300),
-    "hz_eye":    (100, 314),  "hz_oral": (100, 333),
-    "hz_skin":   (100, 352),  "hz_inhale":(100, 371),
-    "fa_eye":    (100, 389),  "fa_oral": (100, 407),
-    "fa_skin":   (100, 425),  "fa_inhale":(100, 443),
-    "spill":     (100, 464),  "disposal":(100, 509),
-    "storage":   (100, 554),
+    "usage":     (100, 237),  "reactivity": (100, 266),
+    "fire":      (100, 297),
+    "hz_eye":    (100, 328),  "hz_oral": (100, 343),
+    "hz_skin":   (100, 358),  "hz_inhale":(100, 373),
+    "fa_eye":    (100, 403),  "fa_oral": (100, 418),
+    "fa_skin":   (100, 433),  "fa_inhale":(100, 448),
+    "spill":     (100, 476),  "disposal":(100, 521),
+    "storage":   (100, 574),
 }
 # ความกว้างจริงที่มีให้ค่าแต่ละช่องวางได้ (pt) วัดจากเส้นแบ่งจริงในเทมเพลต
 # มีเส้นแบ่งแนวตั้งที่ x=360.7 กั้นกล่อง PPE/NFPA/legend/รูปภาชนะ ทางขวาไว้ยาวตั้งแต่ top=251.4 ถึง 722.8
@@ -300,7 +305,7 @@ def _fit_lines(val, avail_height, max_width, base_size=7, min_size=4.5):
     return min_size, line_height, lines
 
 
-BLOCK_TOP_PAD = 2.5  # ขยับบรรทัดแรกลงมาเล็กน้อย กันข้อความชิดเส้นขอบบนของแถวเกินไป
+BLOCK_TOP_PAD = 1.0  # ระยะห่างเพิ่มเติมเล็กน้อยใต้ตำแหน่ง baseline ที่ชดเชย ascent แล้ว (กันชิดขอบบนพอดีเป๊ะ)
 
 
 def draw_text(c, val, avail_height, max_width, size=7, single_line=False, center=False):
@@ -323,8 +328,12 @@ def draw_text(c, val, avail_height, max_width, size=7, single_line=False, center
         return
     font_size, line_height, lines = _fit_lines(val, avail_height - BLOCK_TOP_PAD, max_width, base_size=size)
     c.setFont(FONT_REGULAR, font_size)
+    # "top" ที่ผูกไว้ตอน translate() คือขอบบนตัวอักษรของป้าย (label) แต่ drawString ใช้ y เป็น baseline
+    # ตรงๆ เหมือนที่ทำใน single_line ด้านบน - เดิมใช้แค่ BLOCK_TOP_PAD (2.5pt) คงที่ ไม่ได้ชดเชย ascent
+    # จริง (~75% ของ font size) ทำให้ตัวอักษรบรรทัดแรกลอยสูงเกิน "top" ไปทับแถว/เส้นขอบด้านบนแทน
+    baseline_offset = font_size * 0.75 + BLOCK_TOP_PAD
     for i, ln in enumerate(lines):
-        c.drawString(0, -BLOCK_TOP_PAD - i * line_height, ln)
+        c.drawString(0, -baseline_offset - i * line_height, ln)
 
 
 def draw_header_bar(c, val, top_center, base_size):
