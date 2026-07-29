@@ -225,19 +225,102 @@ def extract_section(text, section_num, next_section_num=None):
     สำคัญ: ทำแบบนี้เพราะหลาย section ใช้ป้ายย่อยชื่อเดียวกัน (เช่น "Eyes:"/"ทางตา" ทั้งใน Section 4
     (การปฐมพยาบาล) และ Section 11 (พิษวิทยา) ความหมายคนละเรื่องกัน ถ้าค้นทั้งไฟล์เฉยๆ อาจไปจับข้อความ
     จาก section ผิดมาใส่ผิดช่องได้
+
+    หมายเหตุ: SDS ตระกูล Sika/CPAC/LANKO/Kemox (ทดสอบจริงแล้วทั้ง 7 ไฟล์) ไม่ได้ขึ้นต้นด้วย "SECTION"
+    หรือ "ส่วนที่" เลย แต่ใช้แค่ "3. องค์ประกอบและข้อมูลเกี่ยวกับส่วนผสม" (เลขหัวข้อ+จุด ต้นบรรทัด)
+    เดิมไม่รองรับรูปแบบนี้เลย ทำให้ extract_section คืน None เสมอสำหรับไฟล์กลุ่มนี้ - เพิ่ม
+    "^N\\." ต้นบรรทัดเป็นอีกทางเลือกหนึ่ง (ต้องอยู่ต้นบรรทัดเท่านั้น กัน false positive จากตัวเลข
+    ลำดับขั้นตอนในเนื้อหา เช่น "1. ถอดคอนแทคเลนส์" ที่มักมีข้อความอื่นนำหน้าในบรรทัดเดียวกัน)
     """
     next_num = next_section_num or (section_num + 1)
-    pattern = rf"(?:SECTION|ส่วนที่)\s*{section_num}\b.*?(?=(?:SECTION|ส่วนที่)\s*{next_num}\b|\Z)"
-    m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+    start = rf"(?:(?:SECTION|ส่วนที่)\s*{section_num}\b|^\s*{section_num}\.\s)"
+    end = rf"(?:(?:SECTION|ส่วนที่)\s*{next_num}\b|^\s*{next_num}\.\s)"
+    pattern = rf"{start}.*?(?={end}|\Z)"
+    m = re.search(pattern, text, re.IGNORECASE | re.DOTALL | re.MULTILINE)
     return m.group(0) if m else None
 
 
 # แถวในตารางส่วนประกอบ (Section 3) รูปแบบ "ชื่อสาร   เลข CAS   ความเข้มข้น (%)" คั่นด้วยช่องว่างยาว
 # เช่น "Phosphoric acid          7664-38-2      30 - 60"
+# ใช้ "[ \t]{2,}" แทน "\s{2,}" เพราะ \s รวม \n ด้วย ถ้าใช้ \s จะจับข้ามบรรทัดได้โดยไม่ได้ตั้งใจ
+# (พบจริง: ไปจับตารางแบบ "แนวตั้ง" ที่แต่ละคอลัมน์อยู่คนละบรรทัดปนมาด้วยบางส่วน ทำให้บางแถวถูกข้าม
+# เพราะ finditer เจอ "แถวปลอม" ก่อนแล้วเลื่อนตำแหน่งค้นหาผ่านแถวจริงไป) ต้องบังคับให้อยู่บรรทัดเดียวกันจริงๆ
 _CAS_TABLE_ROW = re.compile(
-    r"^(?P<name>.{2,60}?)\s{2,}(?P<cas>\d{2,7}-\d{2}-\d)\s{2,}(?P<conc>[\d.]+(?:\s*-\s*[\d.]+)?)\s*%?\s*$",
+    r"^(?P<name>.{2,60}?)[ \t]{2,}(?P<cas>\d{2,7}-\d{2}-\d)[ \t]{2,}(?P<conc>[\d.]+(?:\s*-\s*[\d.]+)?)\s*%?[ \t]*$",
     re.MULTILINE,
 )
+
+# ตารางส่วนผสมอีกแบบ (พบจริงในไฟล์ Sika/CPAC/LANKO/Kemox ทุกไฟล์ที่ทดสอบ) extract ออกมาเป็น
+# "หัวตารางทั้งหมดก่อน แล้วค่าจริงตามมาทีละแถว คนละบรรทัด" แทนที่จะเป็นบรรทัดเดียวคั่นด้วยช่องว่างยาว
+# แบบ _CAS_TABLE_ROW เช่น
+#     ชื่อทางเคมี
+#     หมายเลข CAS
+#     ความเข้มข้น (%)
+#     Limestone
+#     1317-65-3
+#     >= 30 - < 50
+#     Distillates (petroleum), hydrotreated heavy naph-
+#     thenic; Baseoil - unspecified
+#     64742-52-5
+#     >= 0.1 - < 1
+# _CAS_TABLE_ROW จับรูปแบบนี้ไม่ได้เลย (ไม่มีช่องว่างยาวคั่นในบรรทัดเดียวกัน) ทำให้ cas/ingredient_name
+# ออกมาเป็น "-" ทั้งที่จริงมีเลข CAS อยู่ในเอกสาร ต้องแยก parser อีกแบบสำหรับโครงสร้างนี้โดยเฉพาะ
+_VERTICAL_CAS_LINE_RE = re.compile(r"^\d{2,7}-\d{2}-\d$")
+_VERTICAL_NO_CAS_RE = re.compile(r"^(?:not available|n\/?a|ไม่มีข้อมูล|-)$", re.IGNORECASE)
+_VERTICAL_CONC_LINE_RE = re.compile(r"^(?:>=?\s*)?[\d.]+\s*(?:[-–]\s*<?\s*[\d.]+)?\s*%?$")
+
+
+def _parse_vertical_composition_rows(section3_text):
+    """คืน list ของ (name, cas_or_None, score) จากตารางส่วนผสมแบบ "แนวตั้ง" (ดูตัวอย่างด้านบน)
+    ไล่บรรทัดหลังหัวตาราง "ความเข้มข้น" ไปเรื่อยๆ ทุกครั้งที่เจอบรรทัดหน้าตาเป็นเลข CAS (หรือ
+    "Not available"/"ไม่มีข้อมูล" สำหรับสารที่ไม่มีเลข CAS จริง เช่นพอลิเมอร์) ให้ถือว่าบรรทัดก่อนหน้า
+    ที่สะสมมา (อาจมีได้หลายบรรทัดถ้าชื่อสารยาวจนตัดบรรทัด) คือชื่อสาร และบรรทัดถัดไปคือความเข้มข้น
+    """
+    idx = section3_text.find("ความเข้มข้น")
+    if idx == -1:
+        return []
+    lines = [l.strip() for l in section3_text[idx:].split("\n") if l.strip()]
+    rows = []
+    name_buffer = []
+    i = 1  # ข้ามบรรทัดหัวตาราง "ความเข้มข้น (%)" เอง (index 0)
+    while i < len(lines):
+        line = lines[i]
+        is_cas = _VERTICAL_CAS_LINE_RE.match(line)
+        is_no_cas = _VERTICAL_NO_CAS_RE.match(line)
+        if is_cas or is_no_cas:
+            name = " ".join(name_buffer).strip(" -")
+            name_buffer = []
+            if i + 1 < len(lines) and _VERTICAL_CONC_LINE_RE.match(lines[i + 1]):
+                nums = [float(x) for x in re.findall(r"[\d.]+", lines[i + 1])]
+                if name and nums:
+                    rows.append((name, line if is_cas else None, max(nums)))
+                i += 1
+        else:
+            name_buffer.append(line)
+            if len(name_buffer) > 3:  # กันชื่อยาวผิดปกติ (แปลว่าหลุดจากแถวจริงแล้ว)
+                name_buffer.pop(0)
+        i += 1
+    return rows
+
+
+def _parse_composition_rows(text):
+    """คืน list ของ (name, cas_or_None, score) ทุกแถวในตาราง Section 3 ลองรูปแบบตารางแนวนอน
+    (_CAS_TABLE_ROW) ก่อน ถ้าไม่เจอเลยลองแบบแนวตั้ง (_parse_vertical_composition_rows) เพราะ SDS
+    แต่ละไฟล์ extract ตารางออกมาคนละโครงสร้างกัน แล้วแต่ฟอนต์/เครื่องมือสร้าง PDF ต้นทาง"""
+    section3 = extract_section(text, 3)
+    if not section3:
+        return []
+    rows = []
+    for m in _CAS_TABLE_ROW.finditer(section3):
+        nums = [float(x) for x in re.findall(r"[\d.]+", m.group("conc"))]
+        if not nums:
+            continue
+        name = _clean(m.group("name")) or m.group("name").strip()
+        if name:
+            rows.append((name, m.group("cas"), max(nums)))
+    if rows:
+        return rows
+    return _parse_vertical_composition_rows(section3)
 
 
 def parse_cas_from_composition_table(text):
@@ -245,19 +328,13 @@ def parse_cas_from_composition_table(text):
     หาเลข CAS จากตาราง "ส่วนประกอบ" ใน Section 3 (Composition/Information on Ingredients)
     ถ้ามีสารเคมีหลายตัวในตาราง (เป็นส่วนผสม) เลือกเลข CAS ของสารที่มี "Concentration (%)" สูงสุด
     (ใช้ค่าบนสุดของช่วง เช่น "30 - 60" ใช้ 60) เพราะถือเป็นสารหลักของผลิตภัณฑ์
-    คืน None ถ้าหาตารางแบบนี้ไม่เจอ (ให้ผู้เรียก fallback ไปใช้ pattern "CAS No:" ปกติแทน)
+    คืน None ถ้าหาตารางแบบนี้ไม่เจอ หรือสารหลักไม่มีเลข CAS จริง (เช่นพอลิเมอร์) - ให้ผู้เรียก
+    fallback ไปใช้ pattern "CAS No:" ปกติแทน
     """
-    section3 = extract_section(text, 3)
-    if not section3:
-        return None
     best_score, best_cas = None, None
-    for m in _CAS_TABLE_ROW.finditer(section3):
-        nums = [float(x) for x in re.findall(r"[\d.]+", m.group("conc"))]
-        if not nums:
-            continue
-        score = max(nums)
+    for name, cas, score in _parse_composition_rows(text):
         if best_score is None or score > best_score:
-            best_score, best_cas = score, m.group("cas")
+            best_score, best_cas = score, cas
     return best_cas
 
 
@@ -268,19 +345,10 @@ def parse_ingredient_name_from_composition_table(text):
     ชื่อกับ CAS ที่แสดงคู่กันบนฟอร์มเป็นสารตัวเดียวกันเสมอ ไม่ใช่คนละแถวโดยไม่ได้ตั้งใจ)
     คืน None ถ้าหาตารางแบบนี้ไม่เจอ (SDS สารเดี่ยว ไม่มีตารางส่วนผสม)
     """
-    section3 = extract_section(text, 3)
-    if not section3:
-        return None
     best_score, best_name = None, None
-    for m in _CAS_TABLE_ROW.finditer(section3):
-        nums = [float(x) for x in re.findall(r"[\d.]+", m.group("conc"))]
-        if not nums:
-            continue
-        score = max(nums)
+    for name, cas, score in _parse_composition_rows(text):
         if best_score is None or score > best_score:
-            name = _clean(m.group("name")) or m.group("name").strip()
-            if name:
-                best_score, best_name = score, name
+            best_score, best_name = score, name
     return best_name
 
 
@@ -290,19 +358,9 @@ def extract_hazardous_substances(text):
     "Contains: ..." บนฉลากภาชนะบรรจุ (1 ในองค์ประกอบที่ GHS กำหนดให้มีบนฉลาก) เรียงจาก Concentration (%)
     สูงสุดไปต่ำสุด คืน [] ถ้าหาตารางแบบนี้ไม่เจอ (SDS สารเดี่ยว ไม่มีตารางส่วนผสม)
     """
-    section3 = extract_section(text, 3)
-    if not section3:
-        return []
-    rows = []
-    for m in _CAS_TABLE_ROW.finditer(section3):
-        nums = [float(x) for x in re.findall(r"[\d.]+", m.group("conc"))]
-        score = max(nums) if nums else 0
-        name = _clean(m.group("name")) or m.group("name").strip()
-        if name:
-            rows.append((score, name))
-    rows.sort(key=lambda r: r[0], reverse=True)
+    rows = sorted(_parse_composition_rows(text), key=lambda r: r[2], reverse=True)
     seen = []
-    for _, name in rows:
+    for name, cas, score in rows:
         if name not in seen:
             seen.append(name)
     return seen
@@ -712,6 +770,9 @@ def parse_sds(pdf_path):
         block(r"Methods for containment"),
         block(r"Environmental precautions"),
         block(r"วิธีปฏิบัติเมื่อ(?:มี)?การหกรั่วไหล"), block(r"(?:กรณี|การจัดการเมื่อ)สารหกรั่วไหล"),
+        # พบในไฟล์ตระกูล Sika/CPAC/LANKO/Kemox: ป้ายนี้ตัดขึ้นบรรทัดใหม่กลางคำ
+        # ("วิธีการและวัสดุสำหรับกักเก็บ\nและทำความสะอาด") จึงต้องใช้ \s* คั่นแทนการเว้นวรรคปกติ
+        block(r"วิธีการและวัสดุ\s*สำหรับกักเก็บ\s*และทำความสะอาด"),
     ])
     d["disposal"] = grab(t, [
         block(r"Recommendation"),
@@ -724,6 +785,8 @@ def parse_sds(pdf_path):
         block(r"Storage conditions"),
         block(r"Conditions for safe storage"),
         block(r"การเก็บรักษา"), block(r"สภาวะการเก็บรักษาที่ปลอดภัย"),
+        # พบในไฟล์ตระกูล Sika/CPAC/LANKO/Kemox: ใช้ "สภาวะการเก็บที่ปลอดภัย" (ไม่มีคำว่า "รักษา")
+        block(r"สภาวะการเก็บที่ปลอดภัย"),
     ])
     # ดัชนี NFPA มักอยู่ในรูปไดอะแกรมเพชร ไม่ใช่ข้อความเรียงกันแบบปกติ - pdfplumber อาจดึงตัวเลข/ป้าย
     # ออกมาสลับตำแหน่งกับข้อความส่วนอื่นของเอกสาร (เช่น ตาราง HMIS ที่อยู่ใกล้กัน) ถ้าค้นทั้งไฟล์เฉยๆ
