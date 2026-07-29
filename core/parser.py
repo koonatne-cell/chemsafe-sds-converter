@@ -278,7 +278,8 @@ _CAS_TABLE_ROW = re.compile(
 # ออกมาเป็น "-" ทั้งที่จริงมีเลข CAS อยู่ในเอกสาร ต้องแยก parser อีกแบบสำหรับโครงสร้างนี้โดยเฉพาะ
 _VERTICAL_CAS_LINE_RE = re.compile(r"^\d{2,7}-\d{2}-\d$")
 _VERTICAL_NO_CAS_RE = re.compile(r"^(?:not available|n\/?a|ไม่มีข้อมูล|-)$", re.IGNORECASE)
-_VERTICAL_CONC_LINE_RE = re.compile(r"^(?:>=?\s*)?[\d.]+\s*(?:[-–]\s*<?\s*[\d.]+)?\s*%?$")
+# รองรับทั้ง ">= 30 - < 50" (ไทย) และ "<= 100" (อังกฤษ, พบใน SDS ที่มีสารตัวเดียวไม่เกิน 100%)
+_VERTICAL_CONC_LINE_RE = re.compile(r"^(?:[<>]=?\s*)?[\d.]+\s*(?:[-–]\s*[<>]?=?\s*[\d.]+)?\s*%?$")
 
 
 def _parse_vertical_composition_rows(section3_text):
@@ -288,6 +289,8 @@ def _parse_vertical_composition_rows(section3_text):
     ที่สะสมมา (อาจมีได้หลายบรรทัดถ้าชื่อสารยาวจนตัดบรรทัด) คือชื่อสาร และบรรทัดถัดไปคือความเข้มข้น
     """
     idx = section3_text.find("ความเข้มข้น")
+    if idx == -1:
+        idx = section3_text.lower().find("concentration")  # SDS ภาษาอังกฤษที่ใช้ตารางแนวตั้งแบบนี้
     if idx == -1:
         return []
     lines = [l.strip() for l in section3_text[idx:].split("\n") if l.strip()]
