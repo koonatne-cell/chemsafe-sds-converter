@@ -20,22 +20,71 @@ import fitz  # PyMuPDF
 # ไม้โทพบบ่อยรองลงมา จึงเดาว่าตัวที่เจอบ่อยสุด/รองลงมาคือไม้เอก/ไม้โทตามลำดับ (ผ่านการยืนยันด้วยไฟล์จริง
 # หลายฉบับแล้วว่าแม่นมาก) ต้องเจอซ้ำอย่างน้อย MIN_MARK_COUNT ครั้งถึงจะเชื่อว่าเป็นวรรณยุกต์จริง กันไป
 # เข้าใจผิดสัญลักษณ์ทั่วไป (เช่น bullet "·") ว่าเป็นวรรณยุกต์
+
+# หมายเหตุ: ใช้ " \t\r\n" (whitespace จริงๆ) แทน \s เพราะ \s ของ Python ใน Unicode mode
+# นับอักขระควบคุม C0 บางตัว (เช่น \x1d Group Separator) เป็น "ช่องว่าง" ด้วย! ถ้าฟอนต์ SDS
+# แมปตัวอักษรวรรณยุกต์ที่พังไปเป็นอักขระควบคุมพวกนี้ (พบจริงในบางไฟล์) \s จะกันไม่ให้ตรวจจับเจอเลย
+# ทำให้เครื่องหมายที่หายไปแสดงผลเหมือน "ช่องว่างกลางคำ" ที่แก้ไม่ได้ ทั้งที่จริงคือปัญหาเดียวกัน
 _MARK_CANDIDATE_RE = re.compile(
-    r"(?<=[฀-๿])([^฀-๿\sA-Za-z0-9.,;:'\"()\-/+%°&@#*])"
+    r"(?<=[฀-๿])([^฀-๿ \t\r\nA-Za-z0-9.,;:'\"()\-/+%°&@#*])"
 )
-_MARK_GUESSES = ["่", "้"]  # เรียงความถี่จริงในภาษาไทย: ไม้เอกพบบ่อยที่สุด ไม้โทรองลงมา
-_MIN_MARK_COUNT = 8
+# วรรณยุกต์/เครื่องหมายไทยที่มักถูกฟอนต์แปลงผิด เรียงจากพบบ่อยสุดไปหายาก (ใช้เป็นค่าตั้งต้นตอน
+# ยังไม่มีหลักฐานอื่น ไม่ใช่กฎตายตัว - ดูเหตุผลด้านล่างว่าทำไมต้องมีการยืนยันด้วยพจนานุกรมด้วย)
+_MARK_CANDIDATES = ["่", "้", "๊", "๋", "์"]
+_MIN_MARK_COUNT = 2
 
 
 def _fix_broken_thai_glyphs(text):
     """ตรวจจับ+แปลงอักขระวรรณยุกต์ไทยที่เพี้ยนจากฟอนต์ SDS ที่มี ToUnicode ผิดพลาด กลับเป็นตัวจริง
-    (ไม้เอก/ไม้โท) แบบไดนามิกต่อเอกสาร ไม่ต้องรู้ล่วงหน้าว่าไฟล์นี้ใช้อักขระผิดตัวไหน"""
+    แบบไดนามิกต่อเอกสาร ไม่ต้องรู้ล่วงหน้าว่าไฟล์นี้ใช้อักขระผิดตัวไหน
+
+    เดิมเคยเดา mapping จากอันดับความถี่ล้วนๆ (ตัวที่เจอบ่อยสุด = ไม้เอก, รองลงมา = ไม้โท ฯลฯ)
+    แต่พบว่าไฟล์เดียวกันบางไฟล์มี "อักขระผิดคนละตัว" 2 ตัวที่แทนวรรณยุกต์ตัวเดียวกัน (เช่นไฟล์ CPAC
+    ใช้ทั้ง "Ѹ" และ "ҟ" แทนไม้โท เพราะ font subset คนละตัวกันคนละหน้า) ทำให้เดาผิดเป็นวรรณยุกต์อื่น
+    ไปเมื่ออันดับความถี่ไม่ตรงกับที่คาดไว้ - แก้ด้วยการ "ทดลองแทนที่แล้วเช็คกับพจนานุกรมไทยจริง"
+    (pythainlp) แทน: อักขระผิดตัวไหนก็ได้ ลองแทนด้วยวรรณยุกต์ที่เป็นไปได้ทีละตัว แล้วดูว่าคำที่ได้
+    เป็นคำไทยจริงหรือไม่ เลือกตัวที่ทำให้เกิดคำจริงมากที่สุด - แม่นกว่าเพราะอิงเนื้อหาจริงในเอกสาร
+    ไม่ใช่สมมติฐานอันดับความถี่ที่อาจผิดพลาดได้เมื่อมีอักขระผิดหลายตัวปนกัน
+    """
     from collections import Counter
+    from pythainlp.corpus.common import thai_words
+
     counts = Counter(_MARK_CANDIDATE_RE.findall(text))
-    ranked = [ch for ch, n in counts.most_common(len(_MARK_GUESSES)) if n >= _MIN_MARK_COUNT]
-    if not ranked:
+    candidates = [ch for ch, n in counts.items() if n >= _MIN_MARK_COUNT]
+    if not candidates:
         return text
-    mapping = dict(zip(ranked, _MARK_GUESSES))
+
+    words = thai_words()
+    mapping = {}
+    for ch in candidates:
+        best_mark, best_score = None, 0
+        occurrences = [m.start() for m in re.finditer(re.escape(ch), text)]
+        for mark in _MARK_CANDIDATES:
+            score = 0
+            for pos in occurrences:
+                # ตัดช่วงข้อความรอบตำแหน่งที่พบ (ประมาณความยาวคำไทยทั่วไป) มาลองแทนที่แล้ว
+                # เช็คว่ามีคำในพจนานุกรมที่ "ครอบคลุมตำแหน่งที่แทนที่" อยู่หรือไม่
+                window_start = max(0, pos - 12)
+                window_end = min(len(text), pos + 13)
+                window = text[window_start:pos] + mark + text[pos + 1:window_end]
+                rel_pos = pos - window_start
+                for wlen in (2, 3, 4, 5, 6, 7, 8):
+                    for start in range(max(0, rel_pos - wlen + 1), rel_pos + 1):
+                        if start + wlen <= len(window) and start <= rel_pos < start + wlen:
+                            if window[start:start + wlen] in words:
+                                score += 1
+                                break
+                    else:
+                        continue
+                    break
+            if score > best_score:
+                best_score, best_mark = score, mark
+        # ต้องยืนยันได้อย่างน้อยครึ่งหนึ่งของจุดที่เจอ ไม่งั้นไม่มั่นใจพอ ปล่อยอักขระเดิมไว้ดีกว่าเดาผิด
+        if best_mark and best_score >= max(1, len(occurrences) // 2):
+            mapping[ch] = best_mark
+
+    if not mapping:
+        return text
     pattern = re.compile("|".join(re.escape(ch) for ch in mapping))
     return pattern.sub(lambda m: mapping[m.group(0)], text)
 
