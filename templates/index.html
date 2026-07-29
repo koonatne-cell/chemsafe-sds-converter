@@ -85,6 +85,19 @@
                 {% endfor %}
             </div>
         </fieldset>
+
+        <fieldset>
+            <legend>อุปกรณ์คุ้มครองความปลอดภัยส่วนบุคคล (PPE) (ระบบติ๊กให้อัตโนมัติจาก Section 8 ของ SDS - ตรวจสอบ/แก้ไขเองได้)</legend>
+            <div class="pictogram-grid">
+                {% for key, label in ppe_fields %}
+                <label class="pictogram-item">
+                    <input type="checkbox" id="ppe_{{ key }}" name="ppe" value="{{ key }}">
+                    <img src="/static/ppe_icons/{{ key }}.png" alt="{{ label }}">
+                    <span>{{ label }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </fieldset>
     </div>
 
     </div><!-- /#sdsForm -->

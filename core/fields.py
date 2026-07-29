@@ -31,6 +31,20 @@ PICTOGRAM_FIELDS = [
     ("environment", "อันตรายต่อสิ่งแวดล้อม"),
 ]
 
+# อุปกรณ์คุ้มครองความปลอดภัยส่วนบุคคล (PPE) 8 ชนิด (key, ป้ายไทย) เรียงตามลำดับที่ผู้ใช้กำหนด
+# ต่างจาก PICTOGRAM_FIELDS ตรงที่ระบบติ๊กให้อัตโนมัติจากข้อความ Section 8 เลย (ดู detect_ppe ใน
+# parser.py) เพราะผู้ใช้ขอให้ตรวจจับจริง ไม่ใช่แค่คำใบ้ - ผู้ใช้ยังแก้ไข/ติ๊กเพิ่มเองได้เสมอในฟอร์ม
+PPE_FIELDS = [
+    ("safety_glasses", "แว่นตานิรภัย (Safety Glasses)"),
+    ("safety_goggle", "แว่นครอบตา (Safety Goggle)"),
+    ("mask", "หน้ากาก (Mask)"),
+    ("respirator", "เครื่องช่วยหายใจ (Respirator)"),
+    ("glove", "ถุงมือ (Glove)"),
+    ("safety_shoe", "รองเท้านิรภัย (Safety Shoe)"),
+    ("face_shield", "กระบังหน้า (Face Shield)"),
+    ("coverall", "ชุดหมี (Coverall Suit)"),
+]
+
 # (key, ป้ายไทย, ต้องแปลไทยไหม)
 FIELD_GROUPS = [
     ("ข้อมูลระบุสาร", [

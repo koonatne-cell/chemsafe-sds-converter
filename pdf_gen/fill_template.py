@@ -179,6 +179,17 @@ PICTOGRAM_ORDER = [
     "irritant", "health_hazard", "environment",
 ]
 
+# กล่อง "อุปกรณ์คุ้มครองความปลอดภัยส่วนบุคคล" (เดิมว่างเปล่า อยู่ติดกับกล่อง NFPA ทางขวา) วัดตำแหน่งจริง
+# จาก Template.pdf ด้วย fitz: ป้ายหัวข้อ top=252.1, กล่องขวา (ก่อนถึงเพชร NFPA) แบ่งด้วยเส้นขอบที่
+# x=360.7 (ดู _NARROW_DIVIDER_X) ทางขวาไปจนถึงจุดเริ่มเพชร NFPA (~x=490) ด้านล่างจรดเส้นแบ่งก่อนตาราง
+# legend สี/ตัวเลข NFPA ที่ top=458
+PPE_BOX = {"x0": 363, "x1": 485, "top": 270, "bottom": 452}
+PPE_ICON_DIR = os.path.join(HERE, "assets", "ppe_icons")
+PPE_ORDER = [
+    "safety_glasses", "safety_goggle", "mask", "respirator",
+    "glove", "safety_shoe", "face_shield", "coverall",
+]
+
 # ขอบเขตล่างสุดของพื้นที่ข้อมูล SHORT/BLOCK (เส้นขอบกรอบรูปภาพ) ใช้คำนวณพื้นที่ว่างของช่องสุดท้าย
 DATA_AREA_BOTTOM = 610
 
@@ -399,6 +410,36 @@ def draw_pictograms(c, selected_keys):
         draw_image_in_box(c, icon_path, cell)
 
 
+def draw_ppe_icons(c, selected_keys):
+    """
+    วางไอคอน PPE ที่เลือก/ตรวจจับได้ในกล่อง "อุปกรณ์คุ้มครองความปลอดภัยส่วนบุคคล" (PPE_BOX)
+    ใช้ตรรกะเดียวกับ draw_pictograms (จัดเป็น grid แบ่งพื้นที่เท่าๆ กัน เรียงตามลำดับมาตรฐานเสมอ)
+    กล่องนี้กว้างกว่าสูง (122x182pt) เลยจำกัด cols ไว้ที่ 2 เสมอ ไม่ต้องคำนวณ cols ตาม n แบบ pictogram
+    """
+    keys = [k for k in PPE_ORDER if k in (selected_keys or [])]
+    if not keys:
+        return
+    n = len(keys)
+    cols = 2
+    rows = -(-n // cols)  # ceil division
+
+    box_w = PPE_BOX["x1"] - PPE_BOX["x0"]
+    box_h = PPE_BOX["bottom"] - PPE_BOX["top"]
+    cell_w = box_w / cols
+    cell_h = box_h / rows
+
+    for i, key in enumerate(keys):
+        icon_path = os.path.join(PPE_ICON_DIR, f"{key}.png")
+        row, col = divmod(i, cols)
+        cell = {
+            "x0": PPE_BOX["x0"] + col * cell_w,
+            "x1": PPE_BOX["x0"] + (col + 1) * cell_w,
+            "top": PPE_BOX["top"] + row * cell_h,
+            "bottom": PPE_BOX["top"] + (row + 1) * cell_h,
+        }
+        draw_image_in_box(c, icon_path, cell)
+
+
 def _cover_box(c, box):
     """วาดสี่เหลี่ยมสีขาวปิดข้อความตัวอย่างเดิมของเทมเพลต (เช่น '-' หรือ '(EHS Manager)')"""
     c.saveState()
@@ -475,6 +516,7 @@ def build_overlay(data, label_image_path=None, container_image_path=None):
     draw_image_in_box(c, container_image_path, IMAGE_BOXES["container_image"])
     # สัญลักษณ์ GHS ที่ผู้ใช้ติ๊กเลือก (กล่องมุมซ้ายบน)
     draw_pictograms(c, data.get("pictograms"))
+    draw_ppe_icons(c, data.get("ppe"))
     c.showPage(); c.save(); buf.seek(0)
     return buf
 

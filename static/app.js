@@ -14,7 +14,7 @@ function setStatus(el, text, kind) {
     el.className = "status " + (kind || "");
 }
 
-// อ่านค่าปัจจุบันจากฟอร์มทั้งหมด คืนเป็น dict {key: value} (pictograms เป็น array แยกต่างหาก)
+// อ่านค่าปัจจุบันจากฟอร์มทั้งหมด คืนเป็น dict {key: value} (pictograms/ppe เป็น array แยกต่างหาก)
 function collectFormData() {
     const data = {};
     const fields = sdsForm.querySelectorAll("textarea, input[type=text], select");
@@ -22,17 +22,26 @@ function collectFormData() {
     data.pictograms = Array.from(
         sdsForm.querySelectorAll("input[name=pictograms]:checked")
     ).map((el) => el.value);
+    data.ppe = Array.from(
+        sdsForm.querySelectorAll("input[name=ppe]:checked")
+    ).map((el) => el.value);
     return data;
 }
 
 // เอา dict ข้อมูลไปใส่ในช่องฟอร์ม
 // หมายเหตุ: ปิดการติ๊กสัญลักษณ์ GHS อัตโนมัติไว้ก่อน (เดาจากคำในไฟล์ยังไม่แม่นพอ) ให้ผู้ใช้ติ๊กเลือกเอง
 // ทั้งหมด - ถ้าจะเปิดกลับมาทีหลัง ดึง data.pictograms ที่ backend ส่งมาแล้วก็อปมาติ๊กเหมือนฟิลด์อื่นได้เลย
+// PPE ต่างจาก pictograms ตรงที่ผู้ใช้ขอให้ติ๊กอัตโนมัติจากข้อความ Section 8 เลย (ดู detect_ppe ใน
+// parser.py) ผู้ใช้ยังแก้ไข/ติ๊กเพิ่ม-ถอดเองได้เสมอหลังจากนั้น
 function fillFormData(data) {
     Object.keys(data).forEach((key) => {
-        if (key === "pictograms") return;
+        if (key === "pictograms" || key === "ppe") return;
         const el = document.getElementById("f_" + key);
         if (el) el.value = data[key] ?? "";
+    });
+    (data.ppe || []).forEach((key) => {
+        const el = document.getElementById("ppe_" + key);
+        if (el) el.checked = true;
     });
 }
 

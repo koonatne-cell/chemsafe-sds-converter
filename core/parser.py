@@ -638,6 +638,38 @@ def detect_pictograms(text):
     return found
 
 
+# คำที่มักเจอใน Section 8 (การควบคุมการรับสัมผัสสาร/การป้องกันส่วนบุคคล) บ่งบอกว่าควรใช้ PPE ชนิดนั้น
+# ต่างจาก PICTOGRAM_KEYWORDS ตรงที่ผู้ใช้ขอให้ "ตรวจจับจริง" (ไม่ใช่แค่คำใบ้ที่ปิดการติ๊กอัตโนมัติไว้)
+# เลยให้ผลลัพธ์นี้ไปติ๊ก checkbox ให้อัตโนมัติเลยในฟอร์ม (ผู้ใช้ยังแก้ไข/ติ๊กเพิ่มเองได้เสมอ)
+PPE_KEYWORDS = {
+    "safety_glasses": [r"แว่นตานิรภัย", r"safety\s+glasses"],
+    "safety_goggle": [r"แว่นครอบตา", r"แว่นตากันสารเคมี", r"\bgoggles?\b"],
+    "mask": [r"หน้ากาก", r"\bmask\b", r"การป้องกันระบบทางเดินหายใจ", r"respiratory protection"],
+    "respirator": [r"เครื่องช่วยหายใจ", r"\brespirators?\b", r"ถังอากาศ",
+                   r"self[\-\s]?contained breathing"],
+    "glove": [r"ถุงมือ", r"\bgloves?\b", r"การป้องกันมือ", r"hand protection"],
+    "safety_shoe": [r"รองเท้านิรภัย", r"รองเท้าป้องกัน", r"safety\s+shoes?", r"protective footwear"],
+    "face_shield": [r"กระบังหน้า", r"face\s+shield", r"อุปกรณ์ป้องกันใบหน้า", r"face protection"],
+    "coverall": [r"ชุดหมี", r"ชุดป้องกัน", r"\bcoveralls?\b", r"protective clothing",
+                 r"การป้องกันผิวหนังและลำตัว", r"skin protection", r"body protection"],
+}
+
+
+def detect_ppe(text):
+    """
+    ตรวจจับอุปกรณ์ป้องกันส่วนบุคคล (PPE) ที่ SDS แนะนำ จากคำใน Section 8 (การควบคุมการรับสัมผัสสาร/
+    การป้องกันส่วนบุคคล) เป็นหลัก เพราะเป็น section มาตรฐานที่ระบุอุปกรณ์ป้องกันจริง (ไม่ใช่แค่พูดถึง
+    "ดูหัวข้อที่ 8" แบบ Section 6/7 บางฉบับ) ถ้าหา section 8 ไม่เจอเลย (บาง SDS ไม่มีเลขกำกับหัวข้อ)
+    ค้นทั้งไฟล์แทน คืน list ตามลำดับใน PPE_KEYWORDS ที่เจอจริง (อาจเจอได้หลายอันพร้อมกัน)
+    """
+    section8 = extract_section(text, 8) or text
+    found = []
+    for key, patterns in PPE_KEYWORDS.items():
+        if any(re.search(p, section8, re.IGNORECASE) for p in patterns):
+            found.append(key)
+    return found
+
+
 def parse_sds(pdf_path):
     """ดึงฟิลด์ทั้งหมดที่ Template ต้องการ จากไฟล์ SDS คืนเป็น dict"""
     t = read_all_text(pdf_path)
@@ -853,6 +885,7 @@ def parse_sds(pdf_path):
         or grab(t, [r"Reactivity\s*=\s*([0-4])", r"Reactivity\s*[:\-]\s*([0-4])"], default="")
     )
     d["pictograms"] = detect_pictograms(t)
+    d["ppe"] = detect_ppe(t)
     # สำหรับหน้า "ฉลากภาชนะบรรจุ" (label.html) - Hazard/Precautionary statement + ข้อมูลผู้ผลิต
     # ถ้าดึงไม่ครบ ผู้ใช้แก้ไข/พิมพ์เพิ่มเองในฟอร์มได้ (ไม่บังคับต้องดึงได้ 100%)
     d["hazard_statements"] = extract_hazard_statements(t)

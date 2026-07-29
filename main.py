@@ -32,7 +32,7 @@ from core.parser import parse_sds
 from core.translator import translate_fields
 from pdf_gen.fill_template import fill_from_data
 from pdf_gen.label_template import fill_label
-from core.fields import (FIELD_GROUPS, SIGNATURE_FIELDS, PICTOGRAM_FIELDS,
+from core.fields import (FIELD_GROUPS, SIGNATURE_FIELDS, PICTOGRAM_FIELDS, PPE_FIELDS,
                      NFPA_SPECIAL_OPTIONS, TRANSLATABLE_KEYS, ALL_KEYS,
                      LABEL_SIZE_PRESETS, LABEL_TRANSLATABLE_KEYS,
                      APPROVED_NAME, APPROVED_POSITION)
@@ -76,7 +76,8 @@ def index(request: Request):
     return templates.TemplateResponse(
         request, "index.html",
         {"field_groups": FIELD_GROUPS, "signature_fields": SIGNATURE_FIELDS,
-         "pictogram_fields": PICTOGRAM_FIELDS, "nfpa_special_options": NFPA_SPECIAL_OPTIONS}
+         "pictogram_fields": PICTOGRAM_FIELDS, "ppe_fields": PPE_FIELDS,
+         "nfpa_special_options": NFPA_SPECIAL_OPTIONS}
     )
 
 
