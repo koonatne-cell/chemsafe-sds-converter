@@ -242,10 +242,13 @@ def extract_section(text, section_num, next_section_num=None):
     เดิมไม่รองรับรูปแบบนี้เลย ทำให้ extract_section คืน None เสมอสำหรับไฟล์กลุ่มนี้ - เพิ่ม
     "^N\\." ต้นบรรทัดเป็นอีกทางเลือกหนึ่ง (ต้องอยู่ต้นบรรทัดเท่านั้น กัน false positive จากตัวเลข
     ลำดับขั้นตอนในเนื้อหา เช่น "1. ถอดคอนแทคเลนส์" ที่มักมีข้อความอื่นนำหน้าในบรรทัดเดียวกัน)
+
+    หมายเหตุเพิ่ม: ไฟล์ตระกูลเดียวกันนี้บางฉบับ (เช่น LANKO 101/102/103/107) ใช้ "8," (จุลภาค)
+    แทน "8." (จุด) เฉพาะที่ Section 8 - พิมพ์ไม่สม่ำเสมอกันเองในเอกสารชุดเดียวกัน จึงรับทั้ง . และ ,
     """
     next_num = next_section_num or (section_num + 1)
-    start = rf"(?:(?:SECTION|ส่วนที่)\s*{section_num}\b|^\s*{section_num}\.\s)"
-    end = rf"(?:(?:SECTION|ส่วนที่)\s*{next_num}\b|^\s*{next_num}\.\s)"
+    start = rf"(?:(?:SECTION|ส่วนที่)\s*{section_num}\b|^\s*{section_num}[.,]\s)"
+    end = rf"(?:(?:SECTION|ส่วนที่)\s*{next_num}\b|^\s*{next_num}[.,]\s)"
     pattern = rf"{start}.*?(?={end}|\Z)"
     m = re.search(pattern, text, re.IGNORECASE | re.DOTALL | re.MULTILINE)
     return m.group(0) if m else None
@@ -655,6 +658,26 @@ PPE_KEYWORDS = {
 }
 
 
+# คำปฏิเสธที่มักตามหลังหัวข้อ PPE ทันที บ่งบอกว่า "ไม่จำเป็นต้องใช้" ทั้งที่หัวข้อเองมีคำที่ตรงกับ
+# PPE_KEYWORDS (เช่น "Skin and body protection: ... is not ordinarily required beyond standard
+# work clothes.") ถ้าไม่เช็คจุดนี้จะติ๊กผิดว่าต้องใช้ทั้งที่จริงเอกสารบอกว่าไม่ต้องใช้
+_PPE_NEGATION_RE = re.compile(
+    r"not\s+(?:ordinarily\s+)?(?:required|necessary|needed)|no\s+special\s+(?:measures|protection)|"
+    r"ไม่จำเป็น|ไม่ต้อง(?:ใช้|สวม)?|ไม่มีความจำเป็น",
+    re.IGNORECASE,
+)
+
+
+def _ppe_keyword_found(text, pattern):
+    """เหมือน re.search ธรรมดา แต่เช็คข้อความหลังจุดที่เจอ (~120 ตัวอักษร) ด้วยว่ามีคำปฏิเสธ
+    (_PPE_NEGATION_RE) ตามมาไหม ถ้ามีถือว่าไม่นับ (ลองดูจุดอื่นที่ pattern เดียวกันอาจเจอต่อ)"""
+    for m in re.finditer(pattern, text, re.IGNORECASE):
+        window = text[m.end(): m.end() + 120]
+        if not _PPE_NEGATION_RE.search(window):
+            return True
+    return False
+
+
 def detect_ppe(text):
     """
     ตรวจจับอุปกรณ์ป้องกันส่วนบุคคล (PPE) ที่ SDS แนะนำ จากคำใน Section 8 (การควบคุมการรับสัมผัสสาร/
@@ -665,7 +688,7 @@ def detect_ppe(text):
     section8 = extract_section(text, 8) or text
     found = []
     for key, patterns in PPE_KEYWORDS.items():
-        if any(re.search(p, section8, re.IGNORECASE) for p in patterns):
+        if any(_ppe_keyword_found(section8, p) for p in patterns):
             found.append(key)
     return found
 
