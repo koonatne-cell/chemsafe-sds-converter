@@ -293,12 +293,20 @@ def wrap_thai(text, max_width, font_size=7):
     return lines
 
 
-def _fit_lines(val, avail_height, max_width, base_size=7, min_size=4.5):
+def _fit_lines(val, avail_height, max_width, base_size=7, min_size=4.5, allow_overflow=False):
     """
     หาขนาดฟอนต์ + บรรทัดที่ตัดแล้ว ที่พอดีกับพื้นที่ว่าง (avail_height) และความกว้างจริง (max_width)
     ลดขนาดฟอนต์ทีละ 0.5pt จนกว่าจะพอดี ถ้ายังไม่พอดีที่ขนาดเล็กสุด จะตัดบรรทัดที่เกินออกและใส่ "…" ต่อท้าย
     คืนค่า (font_size, line_height, lines)
+
+    allow_overflow=True (ผู้ใช้ขอเฉพาะช่อง "การปฐมพยาบาล" - ทางตา/ปาก/ผิวหนัง/หายใจ): ใช้ base_size
+    คงที่เสมอ ไม่ลดขนาดฟอนต์ และไม่ตัดบรรทัดทิ้งเลย แม้ข้อความจะยาวเกิน avail_height จนล้นลงไปทับ
+    แถวถัดไปในกล่องเดียวกันก็ตาม (ผู้ใช้เลือกแบบนี้เอง เพราะกล่องแชร์กันจริงมีที่ทางกายภาพจำกัดมาก
+    ยอมรับความเสี่ยงซ้อนทับ ดีกว่าฟอนต์เล็กจนอ่านยาก/ข้อความปฐมพยาบาลถูกตัดหาย)
     """
+    if allow_overflow:
+        lines = wrap_thai(val, max_width, font_size=base_size)
+        return base_size, base_size + 1.3, lines
     size = base_size
     lines = []
     line_height = size + 1.3
@@ -319,9 +327,11 @@ def _fit_lines(val, avail_height, max_width, base_size=7, min_size=4.5):
 BLOCK_TOP_PAD = 1.0  # ระยะห่างเพิ่มเติมเล็กน้อยใต้ตำแหน่ง baseline ที่ชดเชย ascent แล้ว (กันชิดขอบบนพอดีเป๊ะ)
 
 
-def draw_text(c, val, avail_height, max_width, size=7, single_line=False, center=False):
+def draw_text(c, val, avail_height, max_width, size=7, single_line=False, center=False, allow_overflow=False):
     """เขียนข้อความลงตำแหน่งที่ translate ไว้แล้ว (จุดเริ่ม 0,0) พอดีกับพื้นที่ว่าง/ความกว้างจริงที่มี
-    center=True ใช้กับช่องแคบๆ บรรทัดเดียว (เช่น สี/กลิ่น/pH) ให้ข้อความอยู่กึ่งกลางช่องแทนชิดซ้าย"""
+    center=True ใช้กับช่องแคบๆ บรรทัดเดียว (เช่น สี/กลิ่น/pH) ให้ข้อความอยู่กึ่งกลางช่องแทนชิดซ้าย
+    allow_overflow=True: คงขนาดฟอนต์ไว้เท่า size เสมอ ไม่ลด/ไม่ตัดบรรทัดทิ้ง แม้ข้อความจะยาวเกิน
+    avail_height (ดู _fit_lines) - ใช้กับ "การปฐมพยาบาล" ตามที่ผู้ใช้ขอ"""
     if not val or val == "-":
         return
     if single_line:
@@ -337,7 +347,8 @@ def draw_text(c, val, avail_height, max_width, size=7, single_line=False, center
         else:
             c.drawString(0, y, text)
         return
-    font_size, line_height, lines = _fit_lines(val, avail_height - BLOCK_TOP_PAD, max_width, base_size=size)
+    font_size, line_height, lines = _fit_lines(val, avail_height - BLOCK_TOP_PAD, max_width, base_size=size,
+                                                allow_overflow=allow_overflow)
     c.setFont(FONT_REGULAR, font_size)
     # "top" ที่ผูกไว้ตอน translate() คือขอบบนตัวอักษรของป้าย (label) แต่ drawString ใช้ y เป็น baseline
     # ตรงๆ เหมือนที่ทำใน single_line ด้านบน - เดิมใช้แค่ BLOCK_TOP_PAD (2.5pt) คงที่ ไม่ได้ชดเชย ascent
@@ -469,9 +480,13 @@ def build_overlay(data, label_image_path=None, container_image_path=None):
         c.restoreState()
     # ช่องข้อความยาว (ตัดบรรทัดแบบไทย + ลดฟอนต์อัตโนมัติถ้าจำเป็น) - ฟอนต์เริ่มต้นใหญ่ขึ้นเล็กน้อย
     # (7 -> 8) ยังลดอัตโนมัติได้ถ้าพื้นที่ไม่พอเหมือนเดิม แต่ข้อความสั้นๆ จะได้ตัวใหญ่ขึ้นเห็นชัดกว่าเดิม
+    # ยกเว้น "การปฐมพยาบาล" (fa_eye/fa_oral/fa_skin/fa_inhale) ที่ผู้ใช้ขอให้คงขนาดฟอนต์ไว้เสมอ
+    # ไม่ต้องลดขนาดลงเพื่อให้พอดีช่องเล็กๆ ที่แชร์กัน 4 แถวย่อย ยอมรับความเสี่ยงข้อความยาวล้นทับแถวถัดไป
+    _FA_NO_SHRINK_KEYS = {"fa_eye", "fa_oral", "fa_skin", "fa_inhale"}
     for k, (x, top) in BLOCK.items():
         c.saveState(); c.translate(x, Y(top))
-        draw_text(c, data.get(k, ""), _available_height(top, data), BLOCK_MAX_WIDTH.get(k), size=8)
+        draw_text(c, data.get(k, ""), _available_height(top, data), BLOCK_MAX_WIDTH.get(k), size=8,
+                  allow_overflow=(k in _FA_NO_SHRINK_KEYS))
         c.restoreState()
     # ช่องจัดทำโดย/อนุมัติโดย (บรรทัดเดียว) - ใส่วงเล็บครอบชื่อ/ตำแหน่ง "( ... )" ให้เหมือนตัวอย่าง
     # ที่พิมพ์ไว้แล้วในเทมเพลตฝั่ง "อนุมัติโดย" เช่น "(EHS Manager)" ให้ทั้งสองฝั่งดูสม่ำเสมอกัน
