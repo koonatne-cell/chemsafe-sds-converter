@@ -108,10 +108,19 @@ async def api_parse(sds_file: UploadFile = File(...)):
 async def api_translate(payload: dict):
     """รับ dict ข้อมูล (อังกฤษ) แปลเฉพาะฟิลด์ที่ควรแปล คืนข้อมูลชุดใหม่
     ส่ง "keys" มาเองได้ (เช่นหน้าฉลากใช้ LABEL_TRANSLATABLE_KEYS คนละชุดกับฟอร์ม SDS ติดหน้างาน)
-    ถ้าไม่ส่งมา ใช้ TRANSLATABLE_KEYS เดิม (ฟอร์ม SDS ติดหน้างาน)"""
+    ถ้าไม่ส่งมา ใช้ TRANSLATABLE_KEYS เดิม (ฟอร์ม SDS ติดหน้างาน)
+
+    translate_text() ดักข้อผิดพลาดของแต่ละคำแปลไว้แล้ว (คืนค่าเดิมถ้าแปลไม่ได้) แต่กันเผื่อไว้อีกชั้น
+    ตรงนี้ด้วย เพราะ deep-translator เรียก Google Translate แบบไม่เป็นทางการ (web scraping ไม่ใช่ API
+    จริง) บาง hosting (เช่น Render) อาจโดนบล็อก/limit เป็นพักๆ ถ้าเกิด exception ที่ไม่คาดคิดขึ้นระดับนี้
+    (นอกเหนือจาก translate_text) ต้องคืนข้อมูลเดิมของผู้ใช้กลับไปเสมอ ห้ามให้ข้อมูลหายไปเด็ดขาด
+    """
     data = payload.get("data", {})
     keys = payload.get("keys") or TRANSLATABLE_KEYS
-    translated = translate_fields(data, keys)
+    try:
+        translated = translate_fields(data, keys)
+    except Exception:
+        translated = data
     return JSONResponse({"data": translated})
 
 

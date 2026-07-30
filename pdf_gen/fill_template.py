@@ -30,10 +30,12 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE_W, PAGE_H = 595.32, 841.92   # ขนาดหน้าเทมเพลต (points)
 
 # ---------- ฟอนต์ไทย ----------
-# ใช้ Noto Sans Thai (ฟรี, สัญญาอนุญาต SIL Open Font License เผยแพร่ในโค้ด public ได้ถูกกฎหมาย)
-# ต่างจาก Tahoma ที่เป็นฟอนต์ลิขสิทธิ์ของ Microsoft ห้ามแจกจ่ายต่อในซอร์สโค้ด public
-FONT_REGULAR_PATH = os.path.join(HERE, "assets", "fonts", "NotoSansThai-Regular.ttf")
-FONT_BOLD_PATH = os.path.join(HERE, "assets", "fonts", "NotoSansThai-Bold.ttf")
+# ใช้ Sarabun (ฟรี, สัญญาอนุญาต SIL Open Font License เผยแพร่ในโค้ด public ได้ถูกกฎหมาย - ดู
+# assets/fonts/OFL-Sarabun.txt) ผู้ใช้ขอฟอนต์ที่ดูเป็นทางการแบบ Angsana New แต่ฟอนต์นั้นเป็นของ
+# Microsoft ห้ามแจกจ่ายต่อ (เหมือน Tahoma) จึงใช้ Sarabun แทน เป็นฟอนต์มาตรฐานเอกสารราชการไทย
+# (ตระกูลเดียวกับ TH Sarabun New) หน้าตาเป็นทางการใกล้เคียงกัน และฟรีถูกกฎหมาย 100%
+FONT_REGULAR_PATH = os.path.join(HERE, "assets", "fonts", "Sarabun-Regular.ttf")
+FONT_BOLD_PATH = os.path.join(HERE, "assets", "fonts", "Sarabun-Bold.ttf")
 FONT_REGULAR = "THFont"
 FONT_BOLD = "THFont-Bold"
 
