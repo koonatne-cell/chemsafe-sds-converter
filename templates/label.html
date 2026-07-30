@@ -101,7 +101,7 @@
     </div><!-- /#labelForm -->
 
     <div class="card">
-        <div class="step-label">ขั้นตอนที่ 3: เลือกขนาด/แนวฉลาก แล้วสร้างและดาวน์โหลด PDF</div>
+        <div class="step-label">ขั้นตอนที่ 3: เลือกขนาดฉลาก (แนวนอน) แล้วสร้างและดาวน์โหลด PDF</div>
         <div class="field-row" style="max-width: 320px;">
             <label for="labelSize">ขนาดฉลาก</label>
             <select id="labelSize">
@@ -111,18 +111,11 @@
             </select>
         </div>
         <div class="field-row hidden" id="customSizeRow" style="max-width: 320px;">
-            <label>กว้าง x สูง (มม., แนวตั้ง)</label>
+            <label>กว้าง x สูง (มม., แนวนอน)</label>
             <div class="actions-row">
                 <input type="text" id="customWidth" inputmode="decimal" placeholder="กว้าง (มม.)" style="width: 120px;">
                 <span>x</span>
                 <input type="text" id="customHeight" inputmode="decimal" placeholder="สูง (มม.)" style="width: 120px;">
-            </div>
-        </div>
-        <div class="field-row" style="max-width: 320px;">
-            <label>แนวฉลาก</label>
-            <div class="actions-row">
-                <label><input type="radio" name="orientation" value="portrait" checked> แนวตั้ง</label>
-                <label><input type="radio" name="orientation" value="landscape"> แนวนอน</label>
             </div>
         </div>
         <div class="actions-row">

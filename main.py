@@ -14,8 +14,12 @@ main.py - ChemSmart เว็บแอปพลิเคชัน (FastAPI)
 (fill_excel.py + assets/Template.xlsx) ยังเก็บไว้เผื่ออยากกลับไปใช้อีก แต่ตอนนี้ไม่ได้เรียกจากหน้าเว็บแล้ว
 """
 import os
+import re
 import shutil
 import uuid
+from datetime import datetime
+from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 load_dotenv()  # อ่านค่าจากไฟล์ .env (เช่น ADMIN_PASSCODE, SECRET_KEY) ก่อนอย่างอื่นทั้งหมด
@@ -62,9 +66,20 @@ templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
 
 
 def _safe_filename(original_name, prefix):
-    """สร้างชื่อไฟล์ที่ไม่ซ้ำกัน (กัน path traversal / ชื่อไฟล์ชนกัน)"""
+    """สร้างชื่อไฟล์ที่ไม่ซ้ำกัน (กัน path traversal / ชื่อไฟล์ชนกัน) - ใช้เป็นชื่อไฟล์จริงบนดิสก์เท่านั้น
+    ชื่อที่ผู้ใช้เห็นตอนดาวน์โหลดมาจาก _pretty_download_name() แยกต่างหาก (ดูด้านล่าง)"""
     ext = os.path.splitext(original_name or "")[1].lower()
     return f"{prefix}_{uuid.uuid4().hex}{ext}"
+
+
+def _pretty_download_name(prefix, chemical_name):
+    """ชื่อไฟล์ที่ผู้ใช้เห็นตอนดาวน์โหลด รูปแบบ "Label_ชื่อสารเคมี_ddmmyyyy.pdf" (หรือ "SDS_...")
+    ตามที่ผู้ใช้ขอ ใช้วันที่ปัจจุบันตามเวลาไทย (Asia/Bangkok) ไม่ใช่เวลาเซิร์ฟเวอร์ (Render ใช้ UTC
+    ซึ่งอาจเพี้ยนไป 1 วันช่วงใกล้เที่ยงคืนถ้าไม่ระบุ timezone ตรงๆ)"""
+    name = (chemical_name or "").strip() or "Unknown"
+    name = re.sub(r'[\\/:*?"<>|]', "", name)  # ตัดอักขระที่ใช้เป็นชื่อไฟล์ไม่ได้ (Windows/Unix)
+    date_str = datetime.now(ZoneInfo("Asia/Bangkok")).strftime("%d%m%Y")
+    return f"{prefix}_{name}_{date_str}.pdf"
 
 
 # ---------------------------------------------------------------------------
@@ -175,15 +190,19 @@ async def api_generate(
 
     database.add_record(field_data, out_filename, label_image_filename, container_image_filename)
 
-    return JSONResponse({"download_url": f"/download/{out_filename}"})
+    chemical_name = field_data.get("display_name") or field_data.get("trade_name")
+    pretty_name = _pretty_download_name("SDS", chemical_name)
+    return JSONResponse({"download_url": f"/download/{out_filename}?name={quote(pretty_name)}"})
 
 
 @app.get("/download/{filename}")
-def download(filename: str):
+def download(filename: str, name: str = None):
+    """name (query param, optional) = ชื่อไฟล์ที่อยากให้ผู้ใช้เห็นตอนดาวน์โหลด (ดู
+    _pretty_download_name) ต่างจาก filename (path) ซึ่งเป็นชื่อไฟล์สุ่มจริงบนดิสก์เสมอ"""
     path = os.path.join(GENERATED_DIR, filename)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="ไม่พบไฟล์")
-    return FileResponse(path, media_type="application/pdf", filename=filename)
+    return FileResponse(path, media_type="application/pdf", filename=name or filename)
 
 
 # ---------------------------------------------------------------------------
@@ -210,18 +229,19 @@ async def api_label_generate(data: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="ข้อมูลฟอร์มไม่ถูกต้อง")
 
     size_key = field_data.get("size_key", LABEL_SIZE_PRESETS[0][0])
-    orientation = field_data.get("orientation", "portrait")
     out_filename = _safe_filename("label.pdf", "label")
     out_path = os.path.join(GENERATED_DIR, out_filename)
 
     try:
-        fill_label(field_data, size_key, LABEL_SIZE_PRESETS, out_path, orientation=orientation)
+        # ตัดตัวเลือกแนวตั้ง/แนวนอนออกแล้ว - ฉลากเป็นแนวนอนเสมอตามเทมเพลตอ้างอิงใหม่
+        fill_label(field_data, size_key, LABEL_SIZE_PRESETS, out_path)
     except Exception as ex:
         raise HTTPException(status_code=500, detail=f"สร้างฉลากไม่ได้: {ex}")
 
     database.add_label_record(field_data, size_key, out_filename)
 
-    return JSONResponse({"download_url": f"/download/{out_filename}"})
+    pretty_name = _pretty_download_name("Label", field_data.get("product_name"))
+    return JSONResponse({"download_url": f"/download/{out_filename}?name={quote(pretty_name)}"})
 
 
 # ---------------------------------------------------------------------------

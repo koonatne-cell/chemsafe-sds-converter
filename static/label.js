@@ -57,7 +57,6 @@ function collectLabelData() {
         precautionary_statements: linesToList(document.getElementById("f_precautionary_statements").value),
         supplier_name: document.getElementById("f_supplier_name").value,
         size_key: labelSize.value,
-        orientation: document.querySelector("input[name=orientation]:checked").value,
         custom_width_mm: document.getElementById("customWidth").value,
         custom_height_mm: document.getElementById("customHeight").value,
     };
