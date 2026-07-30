@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-main.py - ChemSafe เว็บแอปพลิเคชัน (FastAPI)
+main.py - ChemSmart เว็บแอปพลิเคชัน (FastAPI)
 
 รันด้วยคำสั่ง:
     uvicorn main:app --reload
@@ -51,7 +51,7 @@ os.makedirs(TEMPLATE_BACKUP_DIR, exist_ok=True)
 
 database.init_db()
 
-app = FastAPI(title="ChemSafe")
+app = FastAPI(title="ChemSmart")
 
 # session ใช้เก็บสถานะ "login เป็น admin แล้ว" ไว้ใน cookie (เข้ารหัสด้วย SECRET_KEY)
 SECRET_KEY = os.environ.get("SECRET_KEY", "chemsafe-dev-secret-change-me")

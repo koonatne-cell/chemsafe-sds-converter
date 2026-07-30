@@ -48,44 +48,44 @@ PPE_FIELDS = [
 # (key, ป้ายไทย, ต้องแปลไทยไหม)
 FIELD_GROUPS = [
     ("ข้อมูลระบุสาร", [
-        ("display_name", "ชื่อสารเคมี (แถบเหลืองบนหัวฟอร์ม ตัวใหญ่)", False),
-        ("signal_word", "Signal Word (แถบแดงบนหัวฟอร์ม เช่น อันตราย/คำเตือน)", True),
+        ("display_name", "ชื่อสารเคมี", False),
+        ("signal_word", "Signal Word", True),
         # ไม่แปล เพราะเป็นชื่อทางการค้า/ชื่อแบรนด์ (proper noun) แปลแล้วจะเพี้ยน เช่น "WHISPER V"
         # เคยถูกแปลงเป็น "วิสเปอร์ โฟร์" (Google Translate เดาทับศัพท์ผิด) ทั้งที่ควรคงชื่อเดิมไว้
         ("trade_name", "ชื่อสารเคมี / ชื่อการค้า", False),
         # ชื่อสารที่ตรงกับแถวเดียวกับ CAS No ด้านล่าง (ดึงจากตาราง Section 3 แถวที่ความเข้มข้นสูงสุด)
         # ใส่ในช่อง "ชื่อทางการค้า" บนหัวฟอร์ม ให้ชื่อกับ CAS ที่โชว์คู่กันเป็นสารตัวเดียวกันเสมอ
-        ("ingredient_name", "ชื่อทางการค้า (ตรงกับ CAS No)", False),
+        ("ingredient_name", "ชื่อทางการค้า", False),
         ("formula", "สูตรทางเคมี", False),
         ("un", "UN No", False),
         ("cas", "CAS No", False),
         ("usage", "การใช้งาน", True),
     ]),
-    ("คุณสมบัติ (Section 9)", [
+    ("คุณสมบัติ", [
         ("state", "สถานะ", True), ("color", "สี", True), ("odor", "กลิ่น", True),
         ("boiling", "จุดเดือด", False), ("ph", "pH", False), ("flash", "จุดวาบไฟ", False),
     ]),
     ("อันตราย / ปฏิกิริยา / ดับเพลิง", [
-        ("reactivity", "การเกิดปฏิกิริยา (Section 10)", True),
-        ("fire", "การดับเพลิง (Section 5)", True),
-        ("hz_eye", "อันตรายต่อสุขภาพ - ทางตา (Section 11)", True),
-        ("hz_skin", "อันตรายต่อสุขภาพ - ทางผิวหนัง (Section 11)", True),
+        ("reactivity", "การเกิดปฏิกิริยา", True),
+        ("fire", "การดับเพลิง", True),
+        ("hz_eye", "อันตรายต่อสุขภาพ - ทางตา", True),
+        ("hz_skin", "อันตรายต่อสุขภาพ - ทางผิวหนัง", True),
         ("hz_oral", "อันตรายต่อสุขภาพ - ทางปาก", True),
         ("hz_inhale", "อันตรายต่อสุขภาพ - ทางการหายใจ", True),
     ]),
-    ("การปฐมพยาบาล (Section 4)", [
+    ("การปฐมพยาบาล", [
         ("fa_eye", "ทางตา", True), ("fa_oral", "ทางปาก", True),
         ("fa_skin", "ทางผิวหนัง", True), ("fa_inhale", "ทางการหายใจ", True),
     ]),
     ("จัดการ / เก็บรักษา", [
-        ("spill", "กรณีหกรั่วไหล (Section 6)", True),
-        ("disposal", "การกำจัด (Section 13)", True),
-        ("storage", "การเก็บรักษา (Section 7)", True),
+        ("spill", "กรณีหกรั่วไหล", True),
+        ("disposal", "การกำจัด", True),
+        ("storage", "การเก็บรักษา", True),
     ]),
-    ("ดัชนี NFPA (Section 2)", [
-        ("nfpa_health", "สุขภาพ (0-4)", False),
-        ("nfpa_fire", "ไวไฟ (0-4)", False),
-        ("nfpa_react", "ปฏิกิริยา (0-4)", False),
+    ("ดัชนี NFPA", [
+        ("nfpa_health", "สุขภาพ", False),
+        ("nfpa_fire", "ไวไฟ", False),
+        ("nfpa_react", "ปฏิกิริยา", False),
     ]),
 ]
 
@@ -93,12 +93,12 @@ FIELD_GROUPS = [
 # แทน checkbox/textarea แบบช่องอื่น ระบบเดาให้เบื้องต้นจากสัญลักษณ์ GHS ที่ตรวจเจอ (oxidizer->OXY,
 # corrosive->COR) แต่ต้องตรวจสอบเองเสมอ เพราะ SDS ไม่ได้ระบุตรงๆ ว่าเลือกอะไร
 NFPA_SPECIAL_OPTIONS = [
-    ("", "(ไม่มี)"),
-    ("OXY", "OXY - ออกซิไดเซอร์ (Oxidizer)"),
+    ("", "ไม่มี"),
+    ("OXY", "OXY - ออกซิไดเซอร์"),
     ("ACID", "ACID - กรด"),
-    ("ALK", "ALK - ด่าง (Alkali)"),
-    ("COR", "COR - กัดกร่อน (Corrosive)"),
-    ("W", "W - ห้ามใช้น้ำ (Use NO water)"),
+    ("ALK", "ALK - ด่าง"),
+    ("COR", "COR - กัดกร่อน"),
+    ("W", "W - ห้ามใช้น้ำ"),
 ]
 
 # รายชื่อ key ทั้งหมดที่ควรแปลเป็นไทย (ใช้ตอนกดปุ่ม "แปลเป็นไทย")

@@ -2,12 +2,12 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>ChemSafe - แปลง SDS เป็นฟอร์มติดหน้างาน</title>
+<title>ChemSmart - แปลง SDS เป็นฟอร์มติดหน้างาน</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <header>
-    <h1>ChemSafe – แปลง SDS เป็นฟอร์มติดหน้างาน</h1>
+    <h1>ChemSmart – แปลง SDS เป็นฟอร์มติดหน้างาน</h1>
     <div class="header-links">
         <a href="/label">สร้างฉลากภาชนะบรรจุ</a>
         <a href="/admin">สำหรับผู้ดูแล (Admin)</a>
@@ -20,10 +20,8 @@
     <div id="sdsForm">
 
     <div class="card">
-        <div class="step-label">ข้อมูลผู้จัดทำ (กรอกก่อนเริ่มก็ได้ ไม่บังคับ)</div>
+        <div class="step-label">ข้อมูลผู้ขอขึ้นทะเบียน (Requester Information)</div>
         <fieldset>
-            <legend>สำหรับพิมพ์ลงท้ายฟอร์ม SDS ติดหน้างาน (ผู้อนุมัติเป็น EHS Manager คนเดิมทุกครั้ง
-                ไม่ต้องกรอก ระบบใส่ให้อัตโนมัติ)</legend>
             {% for key, label in signature_fields %}
             <div class="field-row">
                 <label for="f_{{ key }}">{{ label }}</label>
@@ -62,7 +60,7 @@
         {% endfor %}
 
         <fieldset>
-            <legend>ช่องขาว (Special Hazard) ในรูปเพชร NFPA - เลือกได้อย่างเดียว ปกติไม่มีก็ได้</legend>
+            <legend>คุณสมบัติพิเศษ (Special Hazard)</legend>
             <div class="field-row">
                 <label for="f_nfpa_special">Special Hazard</label>
                 <select id="f_nfpa_special" name="nfpa_special">
@@ -103,10 +101,10 @@
     </div><!-- /#sdsForm -->
 
     <div class="card">
-        <div class="step-label">ขั้นตอนที่ 3: แนบรูปภาพ (ถ้ามี)</div>
+        <div class="step-label">ขั้นตอนที่ 3: แนบรูปภาพ</div>
         <div class="image-boxes">
             <div class="image-box">
-                <div>รูปสลากสารเคมี</div>
+                <div>รูปฉลากสารเคมี</div>
                 <input type="file" id="labelImage" accept="image/*">
                 <div><img id="labelImagePreview" class="hidden"></div>
             </div>
