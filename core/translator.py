@@ -26,16 +26,28 @@ def translate_text(text, source="en", target="th"):
         return text
 
 
+def _safe_translated(original, candidate):
+    """คืนค่าแปลถ้าใช้ได้จริง (ไม่ว่างเปล่า) ไม่งั้นคืนค่าเดิม กันกรณี GoogleTranslator คืนค่าว่าง/
+    เว้นวรรคล้วนโดยไม่ throw exception (เช่นโดน rate-limit จาก IP ของ hosting แล้ว Google ตอบกลับ
+    หน้า error/captcha แทนคำแปลจริง - translate_text() เช็คแค่ผลลัพธ์ว่าง("")ตรงๆ ไม่ครอบคลุมกรณีนี้)
+    ถ้าต้นฉบับเองว่างอยู่แล้วตั้งแต่แรก ก็ไม่ต้องเช็ค (ไม่มีอะไรให้เสียหาย)"""
+    if original and str(original).strip() and not (candidate and str(candidate).strip()):
+        return original
+    return candidate
+
+
 def translate_fields(data, keys):
     """แปลหลายฟิลด์พร้อมกัน รับ dict ข้อมูล + list ของ key ที่ต้องการแปล คืน dict ใหม่
-    ถ้าค่าของ key นั้นเป็น list (เช่น hazard_statements ของหน้าฉลาก) แปลทีละข้อความในลิสต์"""
+    ถ้าค่าของ key นั้นเป็น list (เช่น hazard_statements ของหน้าฉลาก) แปลทีละข้อความในลิสต์
+    ทุกค่าที่แปลแล้วผ่าน _safe_translated() ก่อนเสมอ กันข้อมูลที่ผู้ใช้กรอก/ดึงมาแล้วหายไปเฉยๆ
+    ถ้าการแปลล้มเหลวแบบเงียบๆ (ไม่ throw exception แต่คืนค่าว่าง)"""
     translated = dict(data)
     for k in keys:
         val = data.get(k, "")
         if isinstance(val, list):
-            translated[k] = [translate_text(v) for v in val]
+            translated[k] = [_safe_translated(v, translate_text(v)) for v in val]
         else:
-            translated[k] = translate_text(val)
+            translated[k] = _safe_translated(val, translate_text(val))
     return translated
 
 
