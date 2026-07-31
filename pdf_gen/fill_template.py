@@ -329,12 +329,21 @@ def _fit_lines(val, avail_height, max_width, base_size=7, min_size=4.5, allow_ov
 BLOCK_TOP_PAD = 1.0  # ระยะห่างเพิ่มเติมเล็กน้อยใต้ตำแหน่ง baseline ที่ชดเชย ascent แล้ว (กันชิดขอบบนพอดีเป๊ะ)
 
 
-def draw_text(c, val, avail_height, max_width, size=7, single_line=False, center=False, allow_overflow=False):
+def draw_text(c, val, avail_height, max_width, size=7, single_line=False, center=False, allow_overflow=False,
+              no_wrap=False):
     """เขียนข้อความลงตำแหน่งที่ translate ไว้แล้ว (จุดเริ่ม 0,0) พอดีกับพื้นที่ว่าง/ความกว้างจริงที่มี
     center=True ใช้กับช่องแคบๆ บรรทัดเดียว (เช่น สี/กลิ่น/pH) ให้ข้อความอยู่กึ่งกลางช่องแทนชิดซ้าย
     allow_overflow=True: คงขนาดฟอนต์ไว้เท่า size เสมอ ไม่ลด/ไม่ตัดบรรทัดทิ้ง แม้ข้อความจะยาวเกิน
-    avail_height (ดู _fit_lines) - ใช้กับ "การปฐมพยาบาล" ตามที่ผู้ใช้ขอ"""
+    avail_height (ดู _fit_lines)
+    no_wrap=True: ไม่ตัดขึ้นบรรทัดใหม่เลย วาดทั้งข้อความเป็นบรรทัดเดียวที่ขนาดฟอนต์คงที่ (size) แม้จะ
+    ยาวเกินความกว้างกล่องก็ตาม ยอมให้ไหลล้นออกทางขวา - ใช้กับ "การปฐมพยาบาล" ตามที่ผู้ใช้ขอ (ต่างจาก
+    allow_overflow ตรงที่ allow_overflow ยังตัดขึ้นบรรทัดใหม่ตามความกว้างอยู่ แค่ไม่ลดฟอนต์/ไม่ตัดทิ้ง)"""
     if not val or val == "-":
+        return
+    if no_wrap:
+        c.setFont(FONT_REGULAR, size)
+        baseline_offset = size * 0.75 + BLOCK_TOP_PAD
+        c.drawString(0, -baseline_offset, val.strip())
         return
     if single_line:
         # ช่องบรรทัดเดียว (เช่น ชื่อสาร, CAS No, ชื่อผู้จัดทำ) ไม่ยอมให้ขึ้นบรรทัดใหม่
@@ -482,13 +491,13 @@ def build_overlay(data, label_image_path=None, container_image_path=None):
         c.restoreState()
     # ช่องข้อความยาว (ตัดบรรทัดแบบไทย + ลดฟอนต์อัตโนมัติถ้าจำเป็น) - ฟอนต์เริ่มต้นใหญ่ขึ้นเล็กน้อย
     # (7 -> 8) ยังลดอัตโนมัติได้ถ้าพื้นที่ไม่พอเหมือนเดิม แต่ข้อความสั้นๆ จะได้ตัวใหญ่ขึ้นเห็นชัดกว่าเดิม
-    # ยกเว้น "การปฐมพยาบาล" (fa_eye/fa_oral/fa_skin/fa_inhale) ที่ผู้ใช้ขอให้คงขนาดฟอนต์ไว้เสมอ
-    # ไม่ต้องลดขนาดลงเพื่อให้พอดีช่องเล็กๆ ที่แชร์กัน 4 แถวย่อย ยอมรับความเสี่ยงข้อความยาวล้นทับแถวถัดไป
-    _FA_NO_SHRINK_KEYS = {"fa_eye", "fa_oral", "fa_skin", "fa_inhale"}
+    # ยกเว้น "การปฐมพยาบาล" (fa_eye/fa_oral/fa_skin/fa_inhale) ที่ผู้ใช้ขอให้ไม่ตัดขึ้นบรรทัดใหม่เลย
+    # (no_wrap) เขียนยาวเป็นบรรทัดเดียวที่ขนาดฟอนต์คงที่ ยอมรับข้อความไหลล้นออกทางขวาถ้ายาวเกินกล่อง
+    _FA_NO_WRAP_KEYS = {"fa_eye", "fa_oral", "fa_skin", "fa_inhale"}
     for k, (x, top) in BLOCK.items():
         c.saveState(); c.translate(x, Y(top))
         draw_text(c, data.get(k, ""), _available_height(top, data), BLOCK_MAX_WIDTH.get(k), size=8,
-                  allow_overflow=(k in _FA_NO_SHRINK_KEYS))
+                  no_wrap=(k in _FA_NO_WRAP_KEYS))
         c.restoreState()
     # ช่องจัดทำโดย/อนุมัติโดย (บรรทัดเดียว) - ใส่วงเล็บครอบชื่อ/ตำแหน่ง "( ... )" ให้เหมือนตัวอย่าง
     # ที่พิมพ์ไว้แล้วในเทมเพลตฝั่ง "อนุมัติโดย" เช่น "(EHS Manager)" ให้ทั้งสองฝั่งดูสม่ำเสมอกัน
