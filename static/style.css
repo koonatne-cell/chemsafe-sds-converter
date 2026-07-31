@@ -71,6 +71,19 @@ input[type="file"], input[type="password"], input[type="text"] {
 .status.err { color: #b02a37; }
 .status.busy { color: #a06a00; }
 
+/* ไฮไลท์แดงตรงช่องบังคับกรอกที่ยังไม่กรอก (ชื่อผู้จัดทำ/รูปฉลาก/รูปภาชนะ) - เพิ่มตอนกด "สร้าง PDF"
+   แล้วพบว่ายังกรอกไม่ครบ ลบออกเองทันทีที่ผู้ใช้เริ่มกรอก/เลือกไฟล์ (ดู static/app.js) */
+.field-missing input[type="text"],
+input[type="file"].field-missing {
+    border-color: #b02a37 !important;
+    background: #fdecee;
+}
+.field-row.field-missing label,
+.image-box.field-missing > div:first-child {
+    color: #b02a37;
+    font-weight: bold;
+}
+
 fieldset {
     border: 1px solid #dfe3e8;
     border-radius: 6px;

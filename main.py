@@ -156,6 +156,21 @@ async def api_generate(
     except (json.JSONDecodeError, UnicodeDecodeError):
         raise HTTPException(status_code=400, detail="ข้อมูลฟอร์มไม่ถูกต้อง")
 
+    # บังคับกรอกชื่อผู้จัดทำ + แนบรูปฉลากสารเคมี + รูปภาชนะบรรจุสารเคมี ก่อนสร้าง SDS หน้างานได้เสมอ
+    # (ผู้ใช้ขอไว้ตรงๆ) เช็คซ้ำฝั่ง server ด้วย ไม่ใช่พึ่งแค่ JS ฝั่งหน้าเว็บ กันเลี่ยงเช็คด้วยการยิง
+    # API ตรงๆ - ข้อความ error ให้ตรงกับที่ frontend แจ้งเตือน (โปรดกรอกข้อมูลให้ครบ)
+    missing = []
+    if not (field_data.get("prepared_name") or "").strip():
+        missing.append("ชื่อผู้จัดทำ")
+    if not (field_data.get("prepared_position") or "").strip():
+        missing.append("ตำแหน่งผู้จัดทำ")
+    if label_image is None or not label_image.filename:
+        missing.append("รูปฉลากสารเคมี")
+    if container_image is None or not container_image.filename:
+        missing.append("รูปภาชนะบรรจุสารเคมี")
+    if missing:
+        raise HTTPException(status_code=400, detail="โปรดกรอกข้อมูลให้ครบ: " + ", ".join(missing))
+
     # ให้ทุกฟิลด์ที่ระบบรู้จักมีค่าเสมอ (กันแอปพังถ้าฝั่ง frontend ส่งมาไม่ครบ)
     for key in ALL_KEYS:
         field_data.setdefault(key, "-")

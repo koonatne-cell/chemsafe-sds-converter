@@ -693,6 +693,32 @@ def detect_ppe(text):
     return found
 
 
+# GHS มีคำสัญญาณมาตรฐานแค่ 2 คำเท่านั้น (Danger/อันตราย = รุนแรงกว่า, Warning/คำเตือน) SDS บางฉบับ
+# พิมพ์คำอื่นต่อท้าย/นำหน้าคำมาตรฐานปนมาด้วย (เช่น "DANGER!", "Warning - Flammable") ผู้ใช้ขอให้ตรึง
+# คำมาตรฐานไว้เสมอ ไม่ให้ข้อความอื่นมาแทนที่ ถ้ามีข้อความอื่นจริงให้ต่อท้ายด้วย " + " แทนที่จะทิ้งไป
+_SIGNAL_WORD_PATTERNS = [
+    (r"\bdanger\b", "Danger"),
+    (r"\bwarning\b", "Warning"),
+    (r"อันตราย", "อันตราย"),
+    (r"คำเตือน", "คำเตือน"),
+]
+
+
+def _normalize_signal_word(raw):
+    """ตรึงคำสัญญาณให้เป็นคำมาตรฐาน GHS (Danger/Warning หรือ อันตราย/คำเตือน) เสมอ ข้อความอื่นที่
+    ติดมาด้วย (ถ้ามี) ต่อท้ายด้วย " + " เช่น "Danger + Flammable liquid" แทนที่จะแสดงข้อความดิบ
+    ที่อาจสับสนหรือถูกตัดคำมาตรฐานออกไปเฉยๆ คืนค่าเดิมถ้าหาคำมาตรฐานไม่เจอเลย (ให้ผู้ใช้ตรวจ/แก้เอง)"""
+    raw = (raw or "").strip()
+    if not raw or raw == "-":
+        return raw
+    for pattern, standard in _SIGNAL_WORD_PATTERNS:
+        m = re.search(pattern, raw, re.IGNORECASE)
+        if m:
+            extra = (raw[:m.start()] + raw[m.end():]).strip(" -:,.()!।")
+            return f"{standard} + {extra}" if extra else standard
+    return raw
+
+
 def parse_sds(pdf_path):
     """ดึงฟิลด์ทั้งหมดที่ Template ต้องการ จากไฟล์ SDS คืนเป็น dict"""
     t = read_all_text(pdf_path)
@@ -716,10 +742,10 @@ def parse_sds(pdf_path):
         line(r"ชื่อทางการค้า"), line(r"ชื่อผลิตภัณฑ์"), line(r"ชื่อสินค้า"),
     ])
     d["display_name"] = d["trade_name"]  # ค่าเริ่มต้น: ใช้ชื่อเดียวกับ trade_name (แก้แยกได้ในฟอร์ม)
-    d["signal_word"] = grab(t, [
+    d["signal_word"] = _normalize_signal_word(grab(t, [
         line(r"Signal [Ww]ord"),
         line(r"คำสัญญาณ"),
-    ])
+    ]))
     # ถ้า Section 3 มีตารางส่วนประกอบหลายสาร ให้เลือกเลข CAS ของสารที่ Concentration (%) สูงสุดก่อน
     # (ถือเป็นสารหลักของผลิตภัณฑ์) ถ้าไม่มีตารางแบบนี้ (สารเดี่ยว) ค่อย fallback ไปหา "CAS No:" ปกติ
     d["cas"] = parse_cas_from_composition_table(t) or grab(t, [

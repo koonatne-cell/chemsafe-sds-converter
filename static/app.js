@@ -112,8 +112,67 @@ function setupImagePreview(inputId, previewId) {
 setupImagePreview("labelImage", "labelImagePreview");
 setupImagePreview("containerImage", "containerImagePreview");
 
+// ---------- ช่องบังคับกรอกก่อนสร้าง PDF ได้ (ชื่อผู้จัดทำ + รูปฉลากสารเคมี + รูปภาชนะบรรจุสารเคมี)
+// ผู้ใช้ขอให้กั้นไว้ ไม่ให้สร้าง SDS หน้างานได้ถ้ายังกรอก/แนบไม่ครบ พร้อมไฮไลท์แดง + แจ้งเตือน ----------
+const REQUIRED_TEXT_KEYS = ["prepared_name", "prepared_position"];
+
+function clearFieldMissing(el) {
+    el.classList.remove("field-missing");
+    const wrap = el.closest(".field-row") || el.closest(".image-box");
+    if (wrap) wrap.classList.remove("field-missing");
+}
+
+function markFieldMissing(el) {
+    el.classList.add("field-missing");
+    const wrap = el.closest(".field-row") || el.closest(".image-box");
+    if (wrap) wrap.classList.add("field-missing");
+}
+
+// ลบไฮไลท์แดงทันทีที่ผู้ใช้เริ่มแก้ช่องนั้น (ไม่ต้องรอกด "สร้าง PDF" ซ้ำถึงจะรู้ว่าแก้ครบแล้ว)
+REQUIRED_TEXT_KEYS.forEach((key) => {
+    const el = document.getElementById("f_" + key);
+    if (el) el.addEventListener("input", () => { if (el.value.trim()) clearFieldMissing(el); });
+});
+["labelImage", "containerImage"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", () => { if (el.files.length) clearFieldMissing(el); });
+});
+
+function validateRequiredFields() {
+    const missing = [];
+    REQUIRED_TEXT_KEYS.forEach((key) => {
+        const el = document.getElementById("f_" + key);
+        if (!el) return;
+        if (el.value.trim()) {
+            clearFieldMissing(el);
+        } else {
+            markFieldMissing(el);
+            missing.push(el);
+        }
+    });
+    ["labelImage", "containerImage"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.files.length) {
+            clearFieldMissing(el);
+        } else {
+            markFieldMissing(el);
+            missing.push(el);
+        }
+    });
+    return missing;
+}
+
 // ---------- ขั้นตอนที่ 4: สร้าง + ดาวน์โหลด PDF ----------
 generateBtn.addEventListener("click", async () => {
+    const missing = validateRequiredFields();
+    if (missing.length > 0) {
+        setStatus(generateStatus, "โปรดกรอกข้อมูลให้ครบ (ช่องที่ไฮไลท์สีแดง)", "err");
+        alert("โปรดกรอกข้อมูลให้ครบ: ชื่อผู้จัดทำ, ตำแหน่ง, รูปฉลากสารเคมี และรูปภาชนะบรรจุสารเคมี");
+        missing[0].scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+    }
+
     setStatus(generateStatus, "กำลังสร้าง PDF...", "busy");
     generateBtn.disabled = true;
     downloadLink.classList.add("hidden");
