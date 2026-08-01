@@ -469,6 +469,11 @@ def draw_ppe_icons(c, selected_keys):
     cell_w = box_w / cols
     cell_h = box_h / rows
 
+    # เผื่อระยะขอบใน (padding) รอบไอคอนแต่ละอัน 14% ของขนาดเซลล์ ให้ไอคอนเล็กลงมีที่ว่างรอบตัวชัดเจน
+    # ไม่ชิดขอบกรอบ/ไอคอนข้างเคียงจนดูอึดอัด (ผู้ใช้ขอให้ "ลดขนาดรูป" ลงจากเดิม)
+    pad_x = cell_w * 0.14
+    pad_y = cell_h * 0.14
+
     c.saveState()
     clip = c.beginPath()
     clip.rect(PPE_BOX["x0"], Y(PPE_BOX["bottom"]), box_w, box_h)
@@ -477,10 +482,10 @@ def draw_ppe_icons(c, selected_keys):
         icon_path = os.path.join(PPE_ICON_DIR, f"{key}.png")
         row, col = divmod(i, cols)
         cell = {
-            "x0": PPE_BOX["x0"] + col * cell_w,
-            "x1": PPE_BOX["x0"] + (col + 1) * cell_w,
-            "top": PPE_BOX["top"] + row * cell_h,
-            "bottom": PPE_BOX["top"] + (row + 1) * cell_h,
+            "x0": PPE_BOX["x0"] + col * cell_w + pad_x,
+            "x1": PPE_BOX["x0"] + (col + 1) * cell_w - pad_x,
+            "top": PPE_BOX["top"] + row * cell_h + pad_y,
+            "bottom": PPE_BOX["top"] + (row + 1) * cell_h - pad_y,
         }
         draw_image_in_box(c, icon_path, cell)
     c.restoreState()
