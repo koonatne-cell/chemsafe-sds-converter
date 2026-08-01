@@ -438,18 +438,22 @@ def draw_pictograms(c, selected_keys):
     c.restoreState()
 
 
+PPE_ICON_MAX_SIZE = 42  # เพดานขนาดไอคอน (pt) กันไม่ให้ไอคอนถูกยืดใหญ่/ห่างกันตอนมีแค่ 1-3 อัน
+
+
 def draw_ppe_icons(c, selected_keys):
     """
     วางไอคอน PPE ที่เลือก/ตรวจจับได้ในกล่อง "อุปกรณ์คุ้มครองความปลอดภัยส่วนบุคคล" (PPE_BOX)
 
-    ต่างจาก draw_pictograms 2 จุด (ผู้ใช้รายงานว่าไอคอนล้นออกนอกกรอบไปทับ "การปฐมพยาบาล" ด้านล่าง
-    ซ้ำหลายรอบ แม้ทดสอบเองแล้วไม่เจอ - จึงแก้ให้ "รับประกันไม่ล้นจริง" แทนที่จะพึ่งแค่การคำนวณ):
-      1. หาจำนวนคอลัมน์ที่ทำให้ไอคอนแต่ละอันใหญ่ที่สุดเท่าที่จะพอดี "ทั้งความกว้างและความสูง" ของกรอบ
-         (ลองทุกค่า cols ตั้งแต่ 1 ถึง n แล้วเลือกอันที่ icon_size ได้มากสุด) แทนที่จะ fix cols=2 ตายตัว
-         ซึ่งถ้าคำนวณผิดพลาดจากที่ไหนสักจุด (หรือ deploy โค้ดเก่าค้าง) จะไม่มีอะไรกันไอคอนไม่ให้ล้น
-      2. ตัดพื้นที่วาด (clip) ให้อยู่แค่ในขอบเขต PPE_BOX เท่านั้นเสมอ เป็นการ "รับประกันด้วย PDF clip
-         path" ไม่ใช่แค่คำนวณตำแหน่งให้ถูก - ต่อให้สูตรคำนวณข้างบนพลาดยังไง ก็จะไม่มีพิกเซลไหนของไอคอน
-         ถูกวาดล้นออกนอกกรอบแดงได้เลย (เหมือนที่ผู้ใช้ขอ "ห้ามล้นออกนอกกรอบทุกด้าน" แบบรับประกันจริง)
+    ต่างจาก draw_pictograms 3 จุด (ผู้ใช้รายงานปัญหาซ้ำหลายรอบ ทั้งไอคอนล้นออกนอกกรอบ และตอนแก้ล้น
+    แล้วไอคอนน้อยชิ้นกลับถูกยืดห่างกันจนดูหลวม - แก้ให้ "แน่น กะทัดรัด และรับประกันไม่ล้น" ไปพร้อมกัน):
+      1. ใช้ขนาดไอคอนคงที่ (ไม่เกิน PPE_ICON_MAX_SIZE) + ช่องว่างคงที่เล็กๆ ระหว่างไอคอน แทนการแบ่ง
+         พื้นที่กรอบทั้งหมดเท่าๆ กันตามจำนวนแถว/คอลัมน์ - ไอคอนจะ "ชิดกัน" เสมอไม่ว่าจะมีกี่อัน แทนที่
+         จะถูกยืดใหญ่ขึ้นเรื่อยๆ จนมีช่องว่างเยอะเมื่อมีไอคอนน้อย (เช่น 1 อันในแถวสุดท้ายที่ไม่เต็ม)
+      2. หาจำนวนคอลัมน์ที่ทำให้ตารางทั้งก้อน (ใหญ่สุดเท่าที่ยังพอดีทั้งกว้าง/สูงกรอบ) กะทัดรัดที่สุด
+      3. จัดตารางทั้งก้อนให้อยู่กึ่งกลางแนวนอนของกรอบ ชิดขอบบนกรอบ (ไม่กึ่งกลางแนวตั้ง กันไอคอนลอย
+         ไปกลางกรอบเวลามีน้อยชิ้น) แล้ว "ตัดพื้นที่วาด" (PDF clip) ให้อยู่แค่ในขอบเขต PPE_BOX เสมอ
+         เป็นการรับประกันไม่ล้นจริง ต่อให้สูตรคำนวณข้างบนพลาดยังไงก็ไม่มีพิกเซลไหนหลุดออกนอกกรอบได้
     """
     keys = [k for k in PPE_ORDER if k in (selected_keys or [])]
     if not keys:
@@ -457,22 +461,24 @@ def draw_ppe_icons(c, selected_keys):
     n = len(keys)
     box_w = PPE_BOX["x1"] - PPE_BOX["x0"]
     box_h = PPE_BOX["bottom"] - PPE_BOX["top"]
+    gap = 4  # ช่องว่างคงที่ระหว่างไอคอน (ไม่ใช่สัดส่วนของกรอบ) ให้ไอคอนชิดกันเสมอไม่ว่ากรอบจะใหญ่แค่ไหน
 
-    best_cols, best_icon_size = 1, 0
+    best_cols, best_size = 1, 0
     for cols_try in range(1, n + 1):
         rows_try = -(-n // cols_try)
-        icon_size = min(box_w / cols_try, box_h / rows_try)
-        if icon_size > best_icon_size:
-            best_icon_size, best_cols = icon_size, cols_try
+        size_w = (box_w - (cols_try - 1) * gap) / cols_try
+        size_h = (box_h - (rows_try - 1) * gap) / rows_try
+        size = min(size_w, size_h)
+        if size > best_size:
+            best_size, best_cols = size, cols_try
     cols = best_cols
     rows = -(-n // cols)
-    cell_w = box_w / cols
-    cell_h = box_h / rows
+    icon_size = min(best_size, PPE_ICON_MAX_SIZE)
 
-    # เผื่อระยะขอบใน (padding) รอบไอคอนแต่ละอัน 14% ของขนาดเซลล์ ให้ไอคอนเล็กลงมีที่ว่างรอบตัวชัดเจน
-    # ไม่ชิดขอบกรอบ/ไอคอนข้างเคียงจนดูอึดอัด (ผู้ใช้ขอให้ "ลดขนาดรูป" ลงจากเดิม)
-    pad_x = cell_w * 0.14
-    pad_y = cell_h * 0.14
+    grid_w = cols * icon_size + (cols - 1) * gap
+    grid_h = rows * icon_size + (rows - 1) * gap
+    start_x = PPE_BOX["x0"] + (box_w - grid_w) / 2  # จัดกึ่งกลางแนวนอนทั้งตาราง
+    start_y = PPE_BOX["top"]  # ชิดขอบบนกรอบ
 
     c.saveState()
     clip = c.beginPath()
@@ -481,12 +487,9 @@ def draw_ppe_icons(c, selected_keys):
     for i, key in enumerate(keys):
         icon_path = os.path.join(PPE_ICON_DIR, f"{key}.png")
         row, col = divmod(i, cols)
-        cell = {
-            "x0": PPE_BOX["x0"] + col * cell_w + pad_x,
-            "x1": PPE_BOX["x0"] + (col + 1) * cell_w - pad_x,
-            "top": PPE_BOX["top"] + row * cell_h + pad_y,
-            "bottom": PPE_BOX["top"] + (row + 1) * cell_h - pad_y,
-        }
+        x0 = start_x + col * (icon_size + gap)
+        top = start_y + row * (icon_size + gap)
+        cell = {"x0": x0, "x1": x0 + icon_size, "top": top, "bottom": top + icon_size}
         draw_image_in_box(c, icon_path, cell)
     c.restoreState()
 
