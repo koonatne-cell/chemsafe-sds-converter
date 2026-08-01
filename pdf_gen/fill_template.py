@@ -406,7 +406,8 @@ def draw_pictograms(c, selected_keys):
     """
     วางสัญลักษณ์ GHS ที่เลือกไว้ในกล่องมุมซ้ายบน (PICTOGRAM_BOX)
     ถ้ามีหลายอัน จัดเรียงเป็นตาราง (grid) แบ่งพื้นที่กล่องเท่าๆ กัน เรียงตามลำดับมาตรฐานเสมอ
-    (ไม่ใช่ตามลำดับที่ผู้ใช้ติ๊ก) เพื่อให้หน้าตาเหมือนกันทุกครั้ง
+    (ไม่ใช่ตามลำดับที่ผู้ใช้ติ๊ก) เพื่อให้หน้าตาเหมือนกันทุกครั้ง ตัดพื้นที่วาด (clip) ให้อยู่แค่ใน
+    ขอบเขตกรอบเสมอ (ดูเหตุผลใน draw_ppe_icons - รับประกันไม่ล้นด้วย PDF clip ไม่ใช่แค่คำนวณตำแหน่ง)
     """
     keys = [k for k in PICTOGRAM_ORDER if k in (selected_keys or [])]
     if not keys:
@@ -420,6 +421,10 @@ def draw_pictograms(c, selected_keys):
     cell_w = box_w / cols
     cell_h = box_h / rows
 
+    c.saveState()
+    clip = c.beginPath()
+    clip.rect(PICTOGRAM_BOX["x0"], Y(PICTOGRAM_BOX["bottom"]), box_w, box_h)
+    c.clipPath(clip, stroke=0, fill=0)
     for i, key in enumerate(keys):
         icon_path = os.path.join(PICTOGRAM_ICON_DIR, f"{key}.png")
         row, col = divmod(i, cols)
@@ -430,26 +435,44 @@ def draw_pictograms(c, selected_keys):
             "bottom": PICTOGRAM_BOX["top"] + (row + 1) * cell_h,
         }
         draw_image_in_box(c, icon_path, cell)
+    c.restoreState()
 
 
 def draw_ppe_icons(c, selected_keys):
     """
     วางไอคอน PPE ที่เลือก/ตรวจจับได้ในกล่อง "อุปกรณ์คุ้มครองความปลอดภัยส่วนบุคคล" (PPE_BOX)
-    ใช้ตรรกะเดียวกับ draw_pictograms (จัดเป็น grid แบ่งพื้นที่เท่าๆ กัน เรียงตามลำดับมาตรฐานเสมอ)
-    กล่องนี้กว้างกว่าสูง (122x182pt) เลยจำกัด cols ไว้ที่ 2 เสมอ ไม่ต้องคำนวณ cols ตาม n แบบ pictogram
+
+    ต่างจาก draw_pictograms 2 จุด (ผู้ใช้รายงานว่าไอคอนล้นออกนอกกรอบไปทับ "การปฐมพยาบาล" ด้านล่าง
+    ซ้ำหลายรอบ แม้ทดสอบเองแล้วไม่เจอ - จึงแก้ให้ "รับประกันไม่ล้นจริง" แทนที่จะพึ่งแค่การคำนวณ):
+      1. หาจำนวนคอลัมน์ที่ทำให้ไอคอนแต่ละอันใหญ่ที่สุดเท่าที่จะพอดี "ทั้งความกว้างและความสูง" ของกรอบ
+         (ลองทุกค่า cols ตั้งแต่ 1 ถึง n แล้วเลือกอันที่ icon_size ได้มากสุด) แทนที่จะ fix cols=2 ตายตัว
+         ซึ่งถ้าคำนวณผิดพลาดจากที่ไหนสักจุด (หรือ deploy โค้ดเก่าค้าง) จะไม่มีอะไรกันไอคอนไม่ให้ล้น
+      2. ตัดพื้นที่วาด (clip) ให้อยู่แค่ในขอบเขต PPE_BOX เท่านั้นเสมอ เป็นการ "รับประกันด้วย PDF clip
+         path" ไม่ใช่แค่คำนวณตำแหน่งให้ถูก - ต่อให้สูตรคำนวณข้างบนพลาดยังไง ก็จะไม่มีพิกเซลไหนของไอคอน
+         ถูกวาดล้นออกนอกกรอบแดงได้เลย (เหมือนที่ผู้ใช้ขอ "ห้ามล้นออกนอกกรอบทุกด้าน" แบบรับประกันจริง)
     """
     keys = [k for k in PPE_ORDER if k in (selected_keys or [])]
     if not keys:
         return
     n = len(keys)
-    cols = 2
-    rows = -(-n // cols)  # ceil division
-
     box_w = PPE_BOX["x1"] - PPE_BOX["x0"]
     box_h = PPE_BOX["bottom"] - PPE_BOX["top"]
+
+    best_cols, best_icon_size = 1, 0
+    for cols_try in range(1, n + 1):
+        rows_try = -(-n // cols_try)
+        icon_size = min(box_w / cols_try, box_h / rows_try)
+        if icon_size > best_icon_size:
+            best_icon_size, best_cols = icon_size, cols_try
+    cols = best_cols
+    rows = -(-n // cols)
     cell_w = box_w / cols
     cell_h = box_h / rows
 
+    c.saveState()
+    clip = c.beginPath()
+    clip.rect(PPE_BOX["x0"], Y(PPE_BOX["bottom"]), box_w, box_h)
+    c.clipPath(clip, stroke=0, fill=0)
     for i, key in enumerate(keys):
         icon_path = os.path.join(PPE_ICON_DIR, f"{key}.png")
         row, col = divmod(i, cols)
@@ -460,6 +483,7 @@ def draw_ppe_icons(c, selected_keys):
             "bottom": PPE_BOX["top"] + (row + 1) * cell_h,
         }
         draw_image_in_box(c, icon_path, cell)
+    c.restoreState()
 
 
 def _cover_box(c, box):
