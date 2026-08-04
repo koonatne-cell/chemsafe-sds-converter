@@ -132,8 +132,11 @@ async def api_translate(payload: dict):
     """
     data = payload.get("data", {})
     keys = payload.get("keys") or TRANSLATABLE_KEYS
+    # direction: "en_to_th" (ค่าเริ่มต้น, ปุ่ม "แปลเป็นไทย") หรือ "th_to_en" (ปุ่ม "แปลเป็นอังกฤษ")
+    direction = payload.get("direction", "en_to_th")
+    source, target = ("th", "en") if direction == "th_to_en" else ("en", "th")
     try:
-        translated = translate_fields(data, keys)
+        translated = translate_fields(data, keys, source=source, target=target)
     except Exception:
         translated = data
     return JSONResponse({"data": translated})

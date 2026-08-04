@@ -36,18 +36,19 @@ def _safe_translated(original, candidate):
     return candidate
 
 
-def translate_fields(data, keys):
+def translate_fields(data, keys, source="en", target="th"):
     """แปลหลายฟิลด์พร้อมกัน รับ dict ข้อมูล + list ของ key ที่ต้องการแปล คืน dict ใหม่
     ถ้าค่าของ key นั้นเป็น list (เช่น hazard_statements ของหน้าฉลาก) แปลทีละข้อความในลิสต์
     ทุกค่าที่แปลแล้วผ่าน _safe_translated() ก่อนเสมอ กันข้อมูลที่ผู้ใช้กรอก/ดึงมาแล้วหายไปเฉยๆ
-    ถ้าการแปลล้มเหลวแบบเงียบๆ (ไม่ throw exception แต่คืนค่าว่าง)"""
+    ถ้าการแปลล้มเหลวแบบเงียบๆ (ไม่ throw exception แต่คืนค่าว่าง)
+    source/target สลับได้ (เช่น "th"->"en" ตอนผู้ใช้กด "แปลเป็นอังกฤษ" ย้อนกลับ)"""
     translated = dict(data)
     for k in keys:
         val = data.get(k, "")
         if isinstance(val, list):
-            translated[k] = [_safe_translated(v, translate_text(v)) for v in val]
+            translated[k] = [_safe_translated(v, translate_text(v, source=source, target=target)) for v in val]
         else:
-            translated[k] = _safe_translated(val, translate_text(val))
+            translated[k] = _safe_translated(val, translate_text(val, source=source, target=target))
     return translated
 
 

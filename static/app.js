@@ -3,6 +3,7 @@
 const parseBtn = document.getElementById("parseBtn");
 const parseStatus = document.getElementById("parseStatus");
 const translateBtn = document.getElementById("translateBtn");
+const translateEnBtn = document.getElementById("translateEnBtn");
 const translateStatus = document.getElementById("translateStatus");
 const generateBtn = document.getElementById("generateBtn");
 const generateStatus = document.getElementById("generateStatus");
@@ -74,16 +75,17 @@ parseBtn.addEventListener("click", async () => {
     }
 });
 
-// ---------- ขั้นตอนที่ 2: แปลเป็นไทย ----------
-translateBtn.addEventListener("click", async () => {
+// ---------- ขั้นตอนที่ 2: แปลเป็นไทย / แปลเป็นอังกฤษ (สลับกลับได้ทั้งสองทาง) ----------
+async function runTranslate(direction, btn) {
     setStatus(translateStatus, "กำลังแปล...", "busy");
     translateBtn.disabled = true;
+    translateEnBtn.disabled = true;
     try {
         const data = collectFormData();
         const res = await fetch("/api/translate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ data }),
+            body: JSON.stringify({ data, direction }),
         });
         if (!res.ok) throw new Error("แปลไม่สำเร็จ");
         const json = await res.json();
@@ -93,8 +95,11 @@ translateBtn.addEventListener("click", async () => {
         setStatus(translateStatus, "ผิดพลาด: " + ex.message, "err");
     } finally {
         translateBtn.disabled = false;
+        translateEnBtn.disabled = false;
     }
-});
+}
+translateBtn.addEventListener("click", () => runTranslate("en_to_th"));
+translateEnBtn.addEventListener("click", () => runTranslate("th_to_en"));
 
 // ---------- ขั้นตอนที่ 3: พรีวิวรูปภาพ ----------
 function setupImagePreview(inputId, previewId) {

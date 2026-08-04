@@ -3,6 +3,7 @@
 const parseBtn = document.getElementById("parseBtn");
 const parseStatus = document.getElementById("parseStatus");
 const translateBtn = document.getElementById("translateBtn");
+const translateEnBtn = document.getElementById("translateEnBtn");
 const translateStatus = document.getElementById("translateStatus");
 const generateBtn = document.getElementById("generateBtn");
 const generateStatus = document.getElementById("generateStatus");
@@ -96,17 +97,18 @@ parseBtn.addEventListener("click", async () => {
     }
 });
 
-// ---------- แปลเป็นไทย (ไม่แปล product_name/cas/un/supplier_name/emergency_phone
+// ---------- แปลเป็นไทย / แปลเป็นอังกฤษ (ไม่แปล product_name/cas/un/supplier_name/emergency_phone
 // เพราะเป็นชื่อเฉพาะ/รหัส/เบอร์โทร ดู LABEL_TRANSLATABLE_KEYS ใน fields.py) ----------
-translateBtn.addEventListener("click", async () => {
+async function runTranslate(direction) {
     setStatus(translateStatus, "กำลังแปล...", "busy");
     translateBtn.disabled = true;
+    translateEnBtn.disabled = true;
     try {
         const data = collectLabelData();
         const res = await fetch("/api/translate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ data, keys: LABEL_TRANSLATABLE_KEYS }),
+            body: JSON.stringify({ data, keys: LABEL_TRANSLATABLE_KEYS, direction }),
         });
         if (!res.ok) throw new Error("แปลไม่สำเร็จ");
         const json = await res.json();
@@ -116,8 +118,11 @@ translateBtn.addEventListener("click", async () => {
         setStatus(translateStatus, "ผิดพลาด: " + ex.message, "err");
     } finally {
         translateBtn.disabled = false;
+        translateEnBtn.disabled = false;
     }
-});
+}
+translateBtn.addEventListener("click", () => runTranslate("en_to_th"));
+translateEnBtn.addEventListener("click", () => runTranslate("th_to_en"));
 
 // ---------- ขั้นตอนที่ 3: สร้าง + ดาวน์โหลด PDF ฉลาก ----------
 generateBtn.addEventListener("click", async () => {
